@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  rnd-chat-dev:
+    build:
+      context: ./rnd-chat-dev
+      dockerfile: Dockerfile
+    image: rnd-chat-dev:latest
+    container_name: rnd-chat-dev
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./rnd-chat-dev:/workspace
+    environment:
+      - JUPYTER_TOKEN=localdev
+    restart: unless-stopped
+    # GPU 할당 (Jupyter에서도 GPU 사용 가능)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              device_ids: ['3']
+              capabilities: [gpu]

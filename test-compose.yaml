@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  notebook:
+    build:
+      context: ./test
+      dockerfile: Dockerfile
+    image: rnd-notebook:latest
+    container_name: rnd-notebook
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./test:/workspace
+    environment:
+      - JUPYTER_TOKEN=localdev
+    restart: unless-stopped
