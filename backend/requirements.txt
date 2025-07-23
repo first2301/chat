@@ -1,0 +1,21 @@
+# LLAMA CPP Python - 특정 버전 사용
+llama-cpp-python==0.2.88
+
+# Web framework
+fastapi 
+uvicorn 
+
+# Core ML/AI packages
+huggingface-hub
+langchain-community
+sentence-transformers
+faiss-cpu
+unstructured[all-docs]
+langchain_huggingface
+langchain-elasticsearch
+
+# Optional packages (commented out)
+# langsmith
+# guidance
+# datasets
+# streamlit-chat

@@ -1,0 +1,58 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: myapp-backend:gpu
+    container_name: backend-gpu
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    # GPU 할당 (Docker 19.03+)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # 또는 v2 스펙에서는
+    # gpus: all
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: myapp-frontend:latest
+    container_name: frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  notebook:
+    build:
+      context: ./notebook
+      dockerfile: Dockerfile
+    image: myapp-notebook:gpu
+    container_name: jupyter-notebook
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebook:/workspace
+    environment:
+      - JUPYTER_TOKEN=localdev
+    restart: unless-stopped
+    # GPU 할당 (Jupyter에서도 GPU 사용 가능)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
