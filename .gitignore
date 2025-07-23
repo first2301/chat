@@ -21,6 +21,8 @@ Thumbs.db
 venv/
 .env/
 .venv/
+.venv_chat
+
 
 # 로그 및 임시파일
 *.log
@@ -34,3 +36,6 @@ build/
 # Docker 관련
 *.pid
 *.bak
+
+# 기타
+.ipynb_checkpoints
