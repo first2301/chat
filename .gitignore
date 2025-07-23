@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# 환경설정 및 IDE
+.vscode/
+.idea/
+*.swp
+
+# OS 파일
+.DS_Store
+Thumbs.db
+
+# 가상환경
+venv/
+.env/
+.venv/
+
+# 로그 및 임시파일
+*.log
+*.tmp
+
+# 빌드/배포 산출물
+dist/
+build/
+*.egg-info/
+
+# Docker 관련
+*.pid
+*.bak
