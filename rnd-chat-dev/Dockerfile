@@ -1,6 +1,7 @@
 # CUDA 기반 Dockerfile
-FROM nvidia/cuda:12.9.1-cudnn-runtime-ubuntu22.04
-
+# FROM nvidia/cuda:12.9.1-cudnn-runtime-ubuntu22.04
+# FROM nvidia/cuda:12.9.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 # 환경 변수 설정
 ENV DEBIAN_FRONTEND=noninteractive
@@ -46,14 +47,8 @@ RUN /opt/conda/bin/conda create -y -n chat python=3.11
 # conda 환경 활성화 및 pip 최신화
 RUN /opt/conda/bin/conda run -n chat python -m pip install --upgrade pip
 
-# conda 환경에서 pip로 llama-cpp-python 설치
-# RUN /opt/conda/bin/conda run -n chat pip install --upgrade --quiet llama-cpp-python
-
-# (선택) conda-forge에서 llama-cpp-python 설치 예시 (pip 대신 사용 가능)
-RUN /opt/conda/bin/conda install -n chat -c conda-forge llama-cpp-python
-
-# (선택) llama-cpp-python 버전 명시 예시 (requirements.txt 또는 pip install 시)
-# RUN /opt/conda/bin/conda run -n chat pip install --upgrade --quiet llama-cpp-python==0.2.24
+# conda-forge에서 llama-cpp-python 설치 예시 
+RUN /opt/conda/bin/conda run -n chat bash -c '!CMAKE_ARGS="-DGGML_CUDA=on" FORCE_CMAKE=1 pip install llama-cpp-python'
 
 COPY requirements-base.txt .
 COPY requirements-ml.txt .

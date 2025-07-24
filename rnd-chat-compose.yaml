@@ -15,12 +15,10 @@ services:
       - NVIDIA_VISIBLE_DEVICES=3
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     shm_size: "1g"
-    # GPU 할당 
+    cpus: '8'
+    mem_limit: 8G
     deploy:
       resources:
-        limits:
-          cpus: '8'
-          memory: 8G
         reservations:
           devices:
             - driver: nvidia
