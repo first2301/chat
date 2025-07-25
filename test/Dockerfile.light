@@ -30,17 +30,17 @@ RUN apt-get update && \
 RUN python3 -m venv /opt/venv && \
     pip install --upgrade pip
 
-#––[4] 파이썬 의존성 설치 –––––––––––––––––––––––––––––––––––––––
+#––[4] 파이썬 의존성 설치 (가벼운 버전) –––––––––––––––––––––––
 WORKDIR /workspace
 
 # requirements 파일 복사
-COPY requirements-base.txt requirements-ml.txt ./
+COPY requirements-base.txt requirements-ml-light.txt ./
 
-# 1단계: 공통 패키지 (재시도 및 타임아웃 설정)
+# 1단계: 공통 패키지
 RUN pip install --no-cache-dir --timeout 300 --retries 3 -r requirements-base.txt
 
-# 2단계: ML/대용량 패키지 (재시도 및 타임아웃 설정)
-RUN pip install --no-cache-dir --timeout 600 --retries 5 -r requirements-ml.txt
+# 2단계: 가벼운 ML 패키지
+RUN pip install --no-cache-dir --timeout 300 --retries 3 -r requirements-ml-light.txt
 
 # 소스 코드 복사
 COPY . .
@@ -50,4 +50,4 @@ EXPOSE 8888
 
 CMD ["jupyter", "lab", \
      "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root", \
-     "--NotebookApp.token=", "--NotebookApp.password="]
+     "--NotebookApp.token=", "--NotebookApp.password="] 

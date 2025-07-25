@@ -1,0 +1,4 @@
+# 기본 ML 패키지 (PyTorch 제외)
+sentence-transformers
+faiss-cpu
+unstructured[all-docs] 
