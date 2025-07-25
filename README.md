@@ -88,6 +88,10 @@ docker compose -f test-compose.yaml logs notebook
 docker compose -f test-compose.yaml build --no-cache
 ```
 
+### permission 권한 문제 해결
+sudo usermod -aG docker $USER
+
+
 ### 메모리 부족 오류
 `test-compose.yaml`의 `memory` 제한을 조정하세요.
 

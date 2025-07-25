@@ -1,0 +1,38 @@
+# home
+https://www.pcninc.co.kr/
+
+# Digital Platform
+https://www.pcninc.co.kr/digital/ai.do
+https://www.pcninc.co.kr/digital/bigdata.do
+https://www.pcninc.co.kr/digital/xrcontents.do
+https://www.pcninc.co.kr/digital/portfolio/list.do
+
+# SI/UX
+https://www.pcninc.co.kr/siux/public.do
+https://www.pcninc.co.kr/siux/finance.do
+https://www.pcninc.co.kr/siux/brand.do
+https://www.pcninc.co.kr/siux/health.do
+
+# Solution
+https://www.pcninc.co.kr/solution/oasis.do
+https://www.pcninc.co.kr/solution/apim.do
+https://www.pcninc.co.kr/solution/esearch.do
+https://www.pcninc.co.kr/solution/oasisx.do
+https://www.pcninc.co.kr/solution/datamap.do
+https://www.pcninc.co.kr/solution/trenddata.do
+https://www.pcninc.co.kr/solution/ozai.do
+
+# Company
+https://www.pcninc.co.kr/company/introduce.do
+https://www.pcninc.co.kr/company/business.do?accYear=2023
+https://www.pcninc.co.kr/company/benefit.do
+https://www.pcninc.co.kr/company/history.do
+https://www.pcninc.co.kr/company/location.do
+
+# IR
+https://www.pcninc.co.kr/ir/disinfo/list.do?page=1&pageSize=10
+
+# Notice
+https://www.pcninc.co.kr/notice/press/list.do?page=1&pageSize=6
+https://www.pcninc.co.kr/notice/plus/list.do?page=1&pageSize=6
+https://www.pcninc.co.kr/notice/news/list.do?page=1&pageSize=6
