@@ -2,6 +2,7 @@ huggingface-hub
 langchain-community
 langchain_huggingface
 langchain-elasticsearch
+langchain-ollama
 ipykernel
 ipywidgets
 matplotlib
@@ -10,4 +11,6 @@ pandas
 scikit-learn
 jupyter
 jupyterlab
-notebook 
+notebook
+ollama
+requests 

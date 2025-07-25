@@ -1,10 +1,25 @@
 services:
-  notebook:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: "8G"
+
+  rnd-chat-dev:
     build:
       context: ./test
       dockerfile: Dockerfile
-    image: rnd-notebook:latest
-    container_name: rnd-notebook
+    image: rnd-chat-dev:latest
+    container_name: rnd-chat-dev
     ports:
       - "8888:8888"
     volumes:
@@ -12,8 +27,14 @@ services:
     shm_size: "512m"
     environment:
       - JUPYTER_TOKEN=localdev
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - ollama
     deploy:
       resources:
         limits:
           cpus: "4"
           memory: "4G"
+
+volumes:
+  ollama_data:
