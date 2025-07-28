@@ -39,3 +39,5 @@ build/
 
 # 기타
 .ipynb_checkpoints
+models
+data

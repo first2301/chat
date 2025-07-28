@@ -5,7 +5,7 @@ services:
     ports:
       - "11434:11434"
     volumes:
-      - ollama_data:/root/.ollama
+      - ollama:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
     deploy:
@@ -23,7 +23,7 @@ services:
     ports:
       - "8888:8888"
     volumes:
-      - ./test:/workspace
+      - ./test:/home/jovyan/work
     shm_size: "512m"
     environment:
       - JUPYTER_TOKEN=localdev
