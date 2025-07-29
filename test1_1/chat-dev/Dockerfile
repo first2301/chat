@@ -5,22 +5,24 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PATH="/opt/venv/bin:${PATH}"
 ENV PYTHONPATH="/home/jovyan/work:${PYTHONPATH}"
 
-    
-# ----- 필수 패키지 설치 -----
+# ----- 시스템 패키지 업데이트 및 필수 패키지 설치 -----
 RUN apt-get update && \
     apt-get install -y \
         python3 \
         python3-pip \
         python3-venv \
         wget \
-        git && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+        git \
+        build-essential \
+        curl \
+        && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ----- 가상환경 생성 및 활성화 -----
 RUN python3 -m venv /opt/venv
 
-# ----- 가상환경 활성화 및 패키지 설치 -----
-RUN /opt/venv/bin/pip install --no-cache-dir \
+# ----- pip 업그레이드 및 기본 패키지 설치 -----
+RUN /opt/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    /opt/venv/bin/pip install --no-cache-dir \
     jupyter \
     notebook \
     jupyterlab \
@@ -31,13 +33,13 @@ COPY requirements-base.txt /tmp/
 COPY requirements-ml.txt /tmp/
 
 # PyTorch를 먼저 설치 (타임아웃 방지)
-RUN /opt/venv/bin/pip install --no-cache-dir --timeout 1000 torch 
+RUN /opt/venv/bin/pip install --no-cache-dir --timeout 3000 torch 
 
 # 기본 requirements 설치
-RUN /opt/venv/bin/pip install --no-cache-dir --timeout 1000 -r /tmp/requirements-base.txt
+RUN /opt/venv/bin/pip install --no-cache-dir --timeout 3000 -r /tmp/requirements-base.txt
 
 # ML requirements 설치 (PyTorch는 이미 설치됨)
-RUN /opt/venv/bin/pip install --no-cache-dir --timeout 1000 -r /tmp/requirements-ml.txt
+RUN /opt/venv/bin/pip install --no-cache-dir --timeout 3000 -r /tmp/requirements-ml.txt
 
 # ----- ipykernel을 통해 커널 등록 (가상환경) -----
 RUN /opt/venv/bin/python -m ipykernel install --user --name=venv --display-name "Python (venv)"

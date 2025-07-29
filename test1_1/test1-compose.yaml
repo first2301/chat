@@ -1,21 +1,20 @@
 services:
   ### Vector model server (Ollama)
   ollama:
-    image: ollama/ollama:latest
+    build:
+      context: ./ollama-service
+      dockerfile: Dockerfile
+    image: rnd_ollama:latest
     container_name: rnd_ollama
     ports:
       - "11435:11434"
     volumes:
-      - ./ollama:/root/.ollama
+      - ./ollama-service/Modelfile/Modelfile:/root/.ollama/Modelfile
+      - ./ollama-service/models:/root/.ollama/models
+      
     environment:
       - OLLAMA_HOST=0.0.0.0
-    deploy:
-      resources:
-        limits:
-          cpus: "2"
-          memory: "8G"
-    networks:
-      - chat-network
+
 
   ### Vector store (Qdrant)
   qdrant:
@@ -25,8 +24,7 @@ services:
       - "6333:6333"
     volumes:
       - ./vector_db:/qdrant/storage
-    networks:
-      - chat-network
+
 
   ### Jupyter Notebook environment
   rnd-chat-dev:
@@ -39,6 +37,8 @@ services:
       - "8888:8888"
     volumes:
       - ./chat-dev:/home/jovyan/work
+      - ./ollama-service/models:/home/jovyan/work/models
+      - ./vector_db:/home/jovyan/work/vector_db
     shm_size: "512m"
     environment:
       - JUPYTER_TOKEN=devtoken
@@ -47,15 +47,5 @@ services:
     depends_on:
       - ollama
       - qdrant
-    deploy:
-      resources:
-        limits:
-          cpus: "4"
-          memory: "4G"
-    networks:
-      - chat-network
 
-networks:
-  chat-network:
-    driver: bridge
   
