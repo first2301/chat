@@ -1,7 +1,6 @@
 huggingface-hub
 langchain-community
 langchain_huggingface
-langchain-elasticsearch
 langchain-ollama
 ipykernel
 ipywidgets
@@ -14,5 +13,4 @@ jupyterlab
 notebook
 ollama
 requests 
-qdrant-client
-langchain-qdrant
+selenium

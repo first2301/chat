@@ -21,7 +21,7 @@ services:
       dockerfile: Dockerfile
     image: rnd-chat-dev:latest
     container_name: rnd-chat-dev
-    network_mode: "host"
+    # network_mode: "host" 제거 - 브리지 네트워크 사용
     ports:
       - "8888:8888"
     volumes:
@@ -31,7 +31,7 @@ services:
     shm_size: "512m"
     environment:
       - JUPYTER_TOKEN=devtoken
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_BASE_URL=http://ollama:11434  # 컨테이너 이름으로 접근
     depends_on:
       - ollama
     dns:
@@ -40,8 +40,4 @@ services:
       - 8.8.4.4
       # Cloudflare Public DNS 서버
       - 1.1.1.1
-      - 1.0.0.1
-      # 컨테이너 내부에서 도메인 이름(예: google.com)을 IP 주소로 변환할 때 사용할 DNS 서버 목록입니다.
-      # 이 서버들을 지정된 순서대로 시도하여 DNS 쿼리를 해결합니다.
-      # 외부 네트워크 연결 문제 (ConnectTimeout 등) 해결에 도움이 됩니다.
-  
+      - 1.0.0.1 

@@ -15,6 +15,7 @@ RUN apt-get update && \
         git \
         build-essential \
         curl \
+        iputils-ping \
         && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ----- 가상환경 생성 및 활성화 -----
