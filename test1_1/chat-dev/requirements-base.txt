@@ -14,3 +14,7 @@ notebook
 ollama
 requests 
 selenium
+evaluate
+ragas
+sacrebleu
+deepeval
