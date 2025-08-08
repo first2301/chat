@@ -43,3 +43,5 @@ models
 data
 
 
+embedding_models/
+vector_stores/
