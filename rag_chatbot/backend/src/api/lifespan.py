@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from rag_chatbot.backend.src.services.rag.rag_agent import RAGAgent
+from rag_chatbot.backend.src.services.rag.config import Config
 
 
 @asynccontextmanager
@@ -18,12 +19,20 @@ async def lifespan_context(app: FastAPI):
     앱 시작 시 RAG 에이전트를 생성하고 가능한 경우 벡터스토어를 로드합니다.
     실패하면 `app.state.agent`는 None으로 설정되어, 라우터에서 503을 반환하도록 합니다.
     """
+    # 환경 로드/경로 해석/검증
+    Config.load_env()
+    Config.resolve_paths()
+    Config.validate()
+
+    # 에이전트 초기화 후, 필요 시 벡터스토어 보장(자동 인덱싱 가능)
+    agent = RAGAgent()
     try:
-        agent = RAGAgent()
-        agent.load_vector_store()
-        app.state.agent = agent
+        # Qdrant 연결 기반이므로 load_vector_store 대신 초기화된 상태 사용
+        # 자동 인덱싱 정책(auto_build)이면 내부에서 처리됨
+        _ = agent
     except Exception:
-        app.state.agent = None
+        pass
+    app.state.agent = agent
     yield
     # 종료 시 정리 필요하면 여기에 추가
 

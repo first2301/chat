@@ -11,6 +11,8 @@ beautifulsoup4
 fastapi
 uvicorn
 faiss-cpu
+qdrant-client
+langchain-qdrant
 python-dotenv
 sentence-transformers
 

@@ -4,7 +4,6 @@
 - 실행 시 `app` 객체를 사용하여 Uvicorn에서 서비스를 기동합니다.
 """
 from fastapi import FastAPI
-
 from rag_chatbot.backend.src.api.routers import health as health_router
 from rag_chatbot.backend.src.api.routers import rag as rag_router
 from rag_chatbot.backend.src.api.lifespan import lifespan_context

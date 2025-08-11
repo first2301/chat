@@ -15,7 +15,7 @@
   VECTOR_STORE_PATH=./vector_db
 
   # [선택]
-  EMBEDDING_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2
+  EMBEDDING_MODEL_NAME=BAAI/bge-m3
   EMBEDDING_DEVICE=cpu                # gpu 사용 시 cuda
   CHUNK_SIZE=500
   CHUNK_OVERLAP=50

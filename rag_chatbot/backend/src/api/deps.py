@@ -20,6 +20,7 @@ def get_agent(request: Request) -> RAGAgent:
     """
     agent: Optional[RAGAgent] = getattr(request.app.state, "agent", None)
     if agent is None:
-        raise HTTPException(status_code=503, detail="Vector store not loaded")
+        # 이론상 이제는 항상 존재해야 하지만, 방어적으로 503 유지
+        raise HTTPException(status_code=503, detail="Agent not initialized")
     return agent
 

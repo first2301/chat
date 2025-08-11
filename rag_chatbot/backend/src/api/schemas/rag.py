@@ -1,6 +1,7 @@
 """API 요청/응답 스키마 정의."""
 
 from pydantic import BaseModel
+from typing import List, Optional
 
 
 class QueryRequest(BaseModel):
@@ -12,4 +13,19 @@ class QueryRequest(BaseModel):
     """
     question: str
     mode: str = "lcel"  # 'manual' | 'lcel'
+
+
+class IndexFilesRequest(BaseModel):
+    paths: Optional[List[str]] = None
+    globs: Optional[List[str]] = None
+    force_rebuild: bool = False
+
+
+class IndexUrlsRequest(BaseModel):
+    urls: List[str]
+
+
+class IndexTextRequest(BaseModel):
+    texts: List[str]
+    source: Optional[str] = None
 

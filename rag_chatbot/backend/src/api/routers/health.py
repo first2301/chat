@@ -14,7 +14,7 @@ router = APIRouter()
 def healthz(request: Request):
     """서비스 상태를 반환합니다.
 
-    Returns:
+    Returns:\n
         dict: 벡터스토어 로드 여부 및 핵심 설정 값
     """
     agent_loaded = getattr(request.app.state, "agent", None) is not None

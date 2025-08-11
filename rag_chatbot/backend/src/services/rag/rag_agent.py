@@ -7,16 +7,14 @@
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import ChatOllama
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-from langchain_core.output_parsers import StrOutputParser
 from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHandler
-from langchain_community.document_loaders import WebBaseLoader, PyMuPDFLoader
-from langchain_core.retrievers import BaseRetriever
 from langchain_core.runnables import Runnable, RunnablePassthrough
 from typing import List, Optional
 import os
 from rag_chatbot.backend.src.services.rag.config import Config
+from rag_chatbot.backend.src.services.rag.ingestion_service import IngestionService
+from rag_chatbot.backend.src.services.rag.vector_store_qdrant import VectorStoreManagerQdrant
+from rag_chatbot.backend.src.services.rag.chain_builder import ChainBuilder
 
 class RAGAgent:
     """RAG 에이전트 클래스.
@@ -74,11 +72,6 @@ class RAGAgent:
         self.ollama_base_url = ollama_base_url or Config.ollama_base_url
         self.vector_store_path = vector_store_path or Config.vector_store_path
         
-        # 텍스트 분할 설정
-        self.length_function = len
-        self.is_separator_regex = False
-        self.separators = ["\n\n", "\n", " ", ""]
-        
         # 콜백 매니저
         self.callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
         
@@ -88,7 +81,15 @@ class RAGAgent:
         # 컴포넌트들 초기화
         self.vector_store = None
         self.retriever = None
-        self.llm = None
+        self.ingestion = IngestionService(chunk_size=self.chunk_size, chunk_overlap=self.chunk_overlap)
+        self.chain_builder = ChainBuilder()
+        # LLM은 벡터스토어 유무와 무관하게 초기화하여 LLM-only 경로를 허용
+        self.llm = ChatOllama(
+            model=self.ollama_model,
+            temperature=0.1,
+            base_url=self.ollama_base_url,
+            callback_manager=self.callback_manager,
+        )
         self.chain = None
         
         # 벡터 저장소 로드 또는 생성
@@ -104,28 +105,36 @@ class RAGAgent:
         Returns:
             None
         """
-        # .env의 VECTOR_STORE_PATH만 사용. 경로가 없고 문서도 없으면 에러.
-        if not self.vector_store_path and not self.document_paths:
-            raise ValueError("VECTOR_STORE_PATH가 .env에 설정되어 있지 않고 document_paths도 제공되지 않았습니다.")
-
-        if self.vector_store_path and os.path.exists(self.vector_store_path):
-            # 기존 벡터 저장소 로드 (버전 호환 옵션 포함)
-            try:
-                self.vector_store = self.vector_store_class.load_local(
-                    self.vector_store_path,
-                    self.embedding_model,
-                    allow_dangerous_deserialization=True,
-                )
-            except TypeError:
-                # allow_dangerous_deserialization 미지원 버전 호환
-                self.vector_store = self.vector_store_class.load_local(
-                    self.vector_store_path,
-                    self.embedding_model,
-                )
-        else:
-            # 새로 생성 (문서가 있는 경우)
-            if self.document_paths:
-                self._create_vector_store_from_documents()
+        # Qdrant 우선 사용: 컬렉션 존재/비어있음 정책에 따라 처리
+        try:
+            self.vector_store = VectorStoreManagerQdrant(embeddings=self.embedding_model).vs
+            # 컬렉션이 없으면 생성 시도. langchain Qdrant 래퍼는 호출 시 자동 생성 지원.
+            # document_paths 없고 정책이 auto_build이면 data_dir 스캔으로 생성 시도
+            if not self.document_paths and Config.on_missing_vector_store == "auto_build":
+                discovered = self.ingestion.discover_files()
+                if discovered:
+                    self.document_paths = discovered
+                    self._create_vector_store_from_documents()
+        except Exception:
+            # Qdrant 연결 실패 시 기존 FAISS 경로(하위호환)로 폴백
+            if not self.vector_store_path and not self.document_paths:
+                # LLM-only 허용
+                return
+            if self.vector_store_path and os.path.exists(self.vector_store_path):
+                try:
+                    self.vector_store = self.vector_store_class.load_local(
+                        self.vector_store_path,
+                        self.embedding_model,
+                        allow_dangerous_deserialization=True,
+                    )
+                except TypeError:
+                    self.vector_store = self.vector_store_class.load_local(
+                        self.vector_store_path,
+                        self.embedding_model,
+                    )
+            else:
+                if self.document_paths:
+                    self._create_vector_store_from_documents()
     
     def _create_vector_store_from_documents(self):
         """
@@ -135,133 +144,57 @@ class RAGAgent:
             None
         """
         # 문서 로드
-        documents = self._load_documents()
+        documents = []
+        file_paths = [p for p in self.document_paths if not p.startswith(("http://", "https://"))]
+        url_paths = [p for p in self.document_paths if p.startswith(("http://", "https://"))]
+        if file_paths:
+            documents.extend(self.ingestion.load_files(file_paths))
+        if url_paths:
+            documents.extend(self.ingestion.load_urls(url_paths))
         
         # 텍스트 분할
-        split_docs = self._split_documents(documents)
+        split_docs = self.ingestion.split(documents)
         
-        # 벡터 저장소 생성
-        self.vector_store = self.vector_store_class.from_documents(
-            split_docs, 
-            self.embedding_model
-        )
-        
-        # 저장 (경로가 지정된 경우)
-        if self.vector_store_path:
-            self.vector_store.save_local(self.vector_store_path)
+        # Qdrant가 초기화되어 있으면 업서트, 아니면 로컬 FAISS 생성
+        if self.vector_store is not None and hasattr(self.vector_store, "add_documents"):
+            self.vector_store.add_documents(split_docs)
+        else:
+            self.vector_store = self.vector_store_class.from_documents(
+                split_docs, 
+                self.embedding_model
+            )
+            # Qdrant는 원격 저장이므로 별도 저장 불필요. FAISS 폴백일 때만 저장.
+            if self.vector_store_path and hasattr(self.vector_store, "save_local"):
+                self.vector_store.save_local(self.vector_store_path)
     
-    def _load_documents(self) -> List:
-        """
-        문서들을 로드합니다.
-        
-        Returns:
-            List: 문서 리스트
-        """
-        documents = []
-        
-        for path in self.document_paths:
-            if path.startswith(("http://", "https://")):
-                # 웹 문서 로드
-                loader = self._create_web_loader([path])
-                documents.extend(loader.load())
-            else:
-                # 로컬 파일 로드: PDF 우선 처리, 그 외 텍스트 파일로 가정
-                if path.lower().endswith(".pdf"):
-                    loader = PyMuPDFLoader(path)
-                    documents.extend(loader.load())
-                else:
-                    with open(path, "r", encoding="utf-8") as f:
-                        from langchain_core.documents import Document
-                        documents.append(Document(page_content=f.read(), metadata={"source": path}))
-        
-        return documents
-    
-    def _create_web_loader(self, urls: List[str]):
-        """
-        웹 로더를 생성합니다.
-        
-        Returns:
-            WebBaseLoader: 웹 로더
-        """
-        return WebBaseLoader(
-            web_paths=urls,
-            header_template={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36",
-            }
-        )
-    
-    def _split_documents(self, documents: List):
-        """
-        문서들을 분할합니다.
-        
-        Returns:
-            List: 분할된 문서 리스트
-        """
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=self.chunk_size,
-            chunk_overlap=self.chunk_overlap,
-            length_function=self.length_function,
-            is_separator_regex=self.is_separator_regex,
-            separators=self.separators
-        )
-        return splitter.split_documents(documents)
+    # 로더/스플리터/발견은 전담 컴포넌트가 담당
     
     def _initialize_rag_chain(self):
         """
         RAG 체인을 초기화합니다.
         
-        Returns:
-            None
+        - 벡터스토어가 없는 경우(LLM-only 모드) 체인 생성을 건너뜁니다.
         """
         if self.vector_store is None:
-            raise ValueError("벡터 저장소가 초기화되지 않았습니다. 문서를 먼저 로드해주세요.")
+            # 벡터스토어 없으면 검색 체인을 구성하지 않음(LLM-only 모드)
+            self.retriever = None
+            self.chain = None
+            self.lcel_chain = None
+            return
         
         # 검색기 생성
         self.retriever = self.vector_store.as_retriever(search_kwargs={"k": self.k})
         
-        # LLM 생성
-        self.llm = ChatOllama(
-            model=self.ollama_model,
-            temperature=0.1,
-            base_url=self.ollama_base_url,
-            callback_manager=self.callback_manager
-        )
-        
         # 프롬프트 템플릿 생성
-        prompt = self._create_prompt_template()
+        manual_chain = self.chain_builder.build_manual_chain(self.llm)
         
         # 수동 컨텍스트 주입 체인
-        self.chain = prompt | self.llm | StrOutputParser()
+        self.chain = manual_chain
 
         # LCEL 리트리버 결합 체인
-        self.lcel_chain = {
-            "context": self.retriever | self._format_docs,
-            "question": RunnablePassthrough(),
-        } | prompt | self.llm | StrOutputParser()
+        self.lcel_chain = self.chain_builder.build_lcel_chain(self.retriever | self._format_docs, self.llm)
     
-    def _create_prompt_template(self):
-        """
-        프롬프트 템플릿을 생성합니다.
-        
-        Returns:
-            ChatPromptTemplate: 프롬프트 템플릿
-        """
-        system_template = (
-            "당신은 도움이 되는 AI 어시스턴트입니다. "
-            "주어진 컨텍스트를 바탕으로 질문에 답변해주세요. "
-            "답변은 한글로 작성하고, 사실에 근거하여 논리적으로 답변해주세요."
-        )
-        
-        human_template = (
-            "컨텍스트: {context}\n\n"
-            "질문: {question}\n\n"
-            "위의 컨텍스트를 바탕으로 질문에 답변해주세요."
-        )
-        
-        return ChatPromptTemplate.from_messages([
-            SystemMessagePromptTemplate.from_template(system_template),
-            HumanMessagePromptTemplate.from_template(human_template)
-        ])
+    # 프롬프트는 팩토리가 담당
 
     @staticmethod
     def _format_docs(docs: List) -> str:
@@ -314,29 +247,42 @@ class RAGAgent:
     
     def save_vector_store(self):
         """벡터 저장소를 저장합니다 (.env의 VECTOR_STORE_PATH 필수)."""
-        if not self.vector_store_path:
-            raise ValueError("VECTOR_STORE_PATH가 설정되지 않았습니다. .env에 경로를 지정하세요.")
-        if self.vector_store is None:
-            raise ValueError("저장할 벡터 저장소가 없습니다.")
-        os.makedirs(self.vector_store_path, exist_ok=True)
-        self.vector_store.save_local(self.vector_store_path)
+        # Qdrant 모드에서는 별도 저장이 필요 없습니다. FAISS 폴백만 수행.
+        if hasattr(self.vector_store, "save_local"):
+            if not self.vector_store_path:
+                raise ValueError("VECTOR_STORE_PATH가 설정되지 않았습니다. .env에 경로를 지정하세요.")
+            if self.vector_store is None:
+                raise ValueError("저장할 벡터 저장소가 없습니다.")
+            os.makedirs(self.vector_store_path, exist_ok=True)
+            self.vector_store.save_local(self.vector_store_path)
     
     def load_vector_store(self):
         """벡터 저장소를 로드합니다 (.env의 VECTOR_STORE_PATH 필수)."""
-        if not self.vector_store_path:
-            raise ValueError("VECTOR_STORE_PATH가 설정되지 않았습니다. .env에 경로를 지정하세요.")
+        # Qdrant 모드에서는 컬렉션 연결로 충분합니다. 폴백인 경우에만 디스크에서 로딩.
         try:
-            self.vector_store = self.vector_store_class.load_local(
-                self.vector_store_path,
-                self.embedding_model,
-                allow_dangerous_deserialization=True,
-            )
-        except TypeError:
-            self.vector_store = self.vector_store_class.load_local(
-                self.vector_store_path,
-                self.embedding_model,
-            )
+            self.vector_store = VectorStoreManagerQdrant(embeddings=self.embedding_model).vs
+        except Exception:
+            if not self.vector_store_path:
+                raise ValueError("VECTOR_STORE_PATH가 설정되지 않았습니다. .env에 경로를 지정하세요.")
+            try:
+                self.vector_store = self.vector_store_class.load_local(
+                    self.vector_store_path,
+                    self.embedding_model,
+                    allow_dangerous_deserialization=True,
+                )
+            except TypeError:
+                self.vector_store = self.vector_store_class.load_local(
+                    self.vector_store_path,
+                    self.embedding_model,
+                )
         self._initialize_rag_chain()
+
+    # 증분 인덱싱을 위한 간단한 퍼블릭 API
+    def add_files(self, paths: List[str]):
+        self.add_documents(paths)
+
+    def add_urls(self, urls: List[str]):
+        self.add_documents(urls)
 
     def llm_query(self, question: str) -> str:
         """LLM을 직접 호출하여 답변 텍스트를 반환합니다."""
