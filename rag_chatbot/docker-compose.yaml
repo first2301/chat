@@ -1,60 +1,37 @@
 version: "3.9"
 
 services:
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
     ports:
-      - "11434:11434"
+      - "6333:6333"
     volumes:
-      - ./ollama_data:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [gpu]
-    profiles: ["gpu"]
+      - ./vector_data/storage:/qdrant/storage
+      - ./vector_data/backup:/qdrant/snapshots
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:6333/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
-  rag-gpu:
+  backend:
     build:
-      context: ..\..\  # project root
-      dockerfile: test1_1/RAG/Dockerfile.gpu
-    container_name: rag-gpu
+      context: ./
+      dockerfile: rag_chatbot/Dockerfile.cpu
+    container_name: rag-backend
+    env_file:
+      - ./rag_chatbot/backend/.env.dev
     environment:
-      VECTOR_STORE_PATH: /data/vector_db
-      EMBEDDING_MODEL_NAME: /models/embedding/BGE-m3-ko
-      EMBEDDING_DEVICE: cuda
-      OLLAMA_BASE_URL: http://ollama:11434
-      OLLAMA_MODEL: midm-Q8
+      - QDRANT_URL=http://qdrant:6333
+      - DATA_DIR=/app/rag_chatbot/data
+      - EMBEDDING_MODEL_NAME=/app/rag_chatbot/embedding_models/BGE-m3-ko
     volumes:
-      - ../RAG/vector_db:/data/vector_db
-      - ../../embedding_models:/models/embedding
+      - ./rag_chatbot/embedding_models:/app/rag_chatbot/embedding_models:ro
+      - ./rag_chatbot/data:/app/rag_chatbot/data:ro
     ports:
       - "8000:8000"
     depends_on:
-      - ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [gpu]
-    profiles: ["gpu"]
-
-  rag-cpu:
-    build:
-      context: ..\..\
-      dockerfile: test1_1/RAG/Dockerfile.cpu
-    container_name: rag-cpu
-    environment:
-      VECTOR_STORE_PATH: /data/vector_db
-      EMBEDDING_MODEL_NAME: /models/embedding/BGE-m3-ko
-      EMBEDDING_DEVICE: cpu
-      OLLAMA_BASE_URL: http://localhost:11434
-      OLLAMA_MODEL: midm-Q8
-    volumes:
-      - ../RAG/vector_db:/data/vector_db
-      - ../../embedding_models:/models/embedding
-    ports:
-      - "8000:8000"
-    profiles: ["cpu"]
+      qdrant:
+        condition: service_healthy
 

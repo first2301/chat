@@ -1,20 +1,17 @@
 langchain-core
 langchain-ollama
 langchain-community
-langchain-huggingface
 pandas
 requests 
 evaluate
 deepeval
-pymupdf
 beautifulsoup4
 fastapi
 uvicorn
-faiss-cpu
 qdrant-client
 langchain-qdrant
 python-dotenv
-sentence-transformers
+ 
 
 
 
