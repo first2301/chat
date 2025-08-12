@@ -8,8 +8,8 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from rag_chatbot.backend.src.services.rag.rag_agent import RAGAgent
-from rag_chatbot.backend.src.services.rag.config import Config
+from backend.src.services.rag.rag_agent import RAGAgent
+from backend.src.services.rag.config import Config
 
 
 @asynccontextmanager

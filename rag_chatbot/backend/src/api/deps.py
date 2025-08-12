@@ -6,7 +6,7 @@
 
 from typing import Optional
 from fastapi import Request, HTTPException
-from rag_chatbot.backend.src.services.rag.rag_agent import RAGAgent
+from backend.src.services.rag.rag_agent import RAGAgent
 
 
 def get_agent(request: Request) -> RAGAgent:

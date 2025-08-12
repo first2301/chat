@@ -5,7 +5,7 @@
 """
 
 from fastapi import APIRouter, Request
-from rag_chatbot.backend.src.services.rag.config import Config
+from backend.src.services.rag.config import Config
 
 router = APIRouter()
 

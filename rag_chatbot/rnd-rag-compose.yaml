@@ -42,7 +42,7 @@ services:
       - DATA_DIR=/app/data
       - EMBEDDING_MODEL_NAME=/app/embedding_models/BGE-m3-ko
     volumes:
-      - ./backend:/app
+      - ./backend:/app/backend
       - ./embedding_models:/app/embedding_models:ro
       - ./data:/app/data:ro
     ports:

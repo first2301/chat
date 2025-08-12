@@ -8,7 +8,7 @@ from typing import List
 from langchain_community.document_loaders import WebBaseLoader, PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-from rag_chatbot.backend.src.services.rag.config import Config
+from backend.src.services.rag.config import Config
 
 
 class IngestionService:
@@ -20,8 +20,13 @@ class IngestionService:
             is_separator_regex=False,
             separators=["\n\n", "\n", " ", ""],
         )
-        # rag_chatbot 루트 디렉토리 계산
-        self._rag_root = Path(__file__).resolve().parents[5]
+        # 프로젝트 루트 디렉토리 계산 ("rag_chatbot" 또는 "backend" 어느 쪽이든 인식)
+        here = Path(__file__).resolve()
+        self._rag_root = here
+        for parent in [here] + list(here.parents):
+            if parent.name in ("rag_chatbot", "backend"):
+                self._rag_root = parent
+                break
 
     def discover_files(self, data_dir: str | None = None, patterns: List[str] | None = None) -> List[str]:
         base = Path(data_dir or Config.get_data_dir())

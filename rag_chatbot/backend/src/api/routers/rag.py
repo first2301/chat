@@ -5,9 +5,14 @@
 """
 
 from fastapi import APIRouter, Depends
-from rag_chatbot.backend.src.services.rag.rag_agent import RAGAgent
-from rag_chatbot.backend.src.api.schemas.rag import QueryRequest, IndexFilesRequest, IndexUrlsRequest, IndexTextRequest
-from rag_chatbot.backend.src.api.deps import get_agent
+from backend.src.services.rag.rag_agent import RAGAgent
+from backend.src.api.schemas.rag import (
+    QueryRequest,
+    IndexFilesRequest,
+    IndexUrlsRequest,
+    IndexTextRequest,
+)
+from backend.src.api.deps import get_agent
 
 router = APIRouter(prefix="/rag")
 

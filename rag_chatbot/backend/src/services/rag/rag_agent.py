@@ -11,10 +11,10 @@ from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHan
 from langchain_core.runnables import Runnable, RunnablePassthrough
 from typing import List, Optional
 import os
-from rag_chatbot.backend.src.services.rag.config import Config
-from rag_chatbot.backend.src.services.rag.ingestion_service import IngestionService
-from rag_chatbot.backend.src.services.rag.vector_store_qdrant import VectorStoreManagerQdrant
-from rag_chatbot.backend.src.services.rag.chain_builder import ChainBuilder
+from backend.src.services.rag.config import Config
+from backend.src.services.rag.ingestion_service import IngestionService
+from backend.src.services.rag.vector_store_qdrant import VectorStoreManagerQdrant
+from backend.src.services.rag.chain_builder import ChainBuilder
 
 class RAGAgent:
     """RAG 에이전트 클래스.
