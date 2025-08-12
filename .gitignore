@@ -45,3 +45,5 @@ data
 
 embedding_models/
 vector_stores/
+
+ai_models/

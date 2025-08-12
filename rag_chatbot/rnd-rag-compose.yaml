@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+  # Ollama 서버
+  ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
+    container_name: ollama
+    ports:
+      - "11435:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    volumes:
+      - ./ollama_server:/root/.ollama
+      - ./ai_models:/root/.ollama/ai_models
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./vector_data/qdrant_storage:/qdrant/storage       # 네임드 볼륨 권장
+      - ./vector_data/snapshot_backup:/qdrant/snapshots
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:6333/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    container_name: rag-backend
+    env_file:
+      - ./backend/.env.dev
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - DATA_DIR=/app/data
+      - EMBEDDING_MODEL_NAME=/app/embedding_models/BGE-m3-ko
+    volumes:
+      - ./backend:/app
+      - ./embedding_models:/app/embedding_models:ro
+      - ./data:/app/data:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      qdrant:
+        condition: service_healthy

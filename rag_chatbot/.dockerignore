@@ -1,0 +1,51 @@
+# Docker 관련
+docker-compose.yaml
+Dockerfile*
+.dockerignore
+
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+.Python
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 환경 (가상환경만 제외)
+.venv/
+venv/
+env/
+# .env* 제거 - 백엔드에서 필요
+
+# 대용량 데이터 (볼륨 마운트로 대체)
+ai_models/
+vector_data/
+embedding_models/
+
+# 로그 및 임시
+*.log
+logs/
+tmp/
+temp/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 문서
+README.md
+*.md
+
+# 테스트
+tests/
+test_*
