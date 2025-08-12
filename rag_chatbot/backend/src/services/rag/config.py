@@ -17,7 +17,7 @@ _explicit_env_file = os.getenv("ENV_FILE") or os.getenv("DOTENV_FILE")
 def _find_rag_root(start: Path) -> Path:
     """현재 파일에서 상위로 올라가며 `rag_chatbot` 루트를 탐색합니다."""
     for parent in [start] + list(start.parents):
-        if parent.name == "rag_chatbot":
+        if parent.name == "app":
             return parent
     # 실패 시 보수적으로 4단계 상위(…/rag_chatbot/backend/src/services/rag → rag_chatbot)
     try:
@@ -73,7 +73,7 @@ class Config:
     qdrant_collection: str = os.getenv("QDRANT_COLLECTION", "rag_collection")
 
     # 데이터 소스/자동 인덱싱 설정
-    data_dir: str = os.getenv("DATA_DIR", "rag_chatbot/data")
+    data_dir: str = os.getenv("DATA_DIR", "app/data")
     doc_globs_raw: str = os.getenv("DOC_GLOBS", "**/*.pdf,**/*.txt")
     on_missing_vector_store: str = os.getenv(
         "ON_MISSING_VECTOR_STORE", "auto_build"
