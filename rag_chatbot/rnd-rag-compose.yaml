@@ -25,11 +25,6 @@ services:
     volumes:
       - ./vector_data/qdrant_storage:/qdrant/storage       # 네임드 볼륨 권장
       - ./vector_data/snapshot_backup:/qdrant/snapshots
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:6333/readyz"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
 
   backend:
     build:

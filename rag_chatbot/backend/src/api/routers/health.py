@@ -25,3 +25,7 @@ def healthz(request: Request):
         "ollama_base_url": getattr(Config, "ollama_base_url", None),
     }
 
+
+@router.get("/")
+async def root():
+    return {"message": "FastAPI is running"}
