@@ -172,8 +172,9 @@ class Config:
         - EMBEDDING_MODEL_NAME이 로컬 경로로 제공될 경우, 실행 위치와 무관하게
           프로젝트 기준 절대경로로 안전하게 해석합니다.
         """
+        # 빈 문자열("")도 미지정으로 간주하여 자동 판단
         device = cls.embedding_device
-        if device is None:
+        if not device:
             try:
                 import torch  # noqa: F401
                 import torch.cuda  # noqa: F401
