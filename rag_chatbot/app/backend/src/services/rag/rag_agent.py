@@ -60,6 +60,7 @@ class RAGAgent:
         k: Optional[int] = None,
         ollama_base_url: Optional[str] = None,
         ollama_model_name: Optional[str] = None,
+        ollama_temperature: Optional[float] = None,
         vector_store_path: Optional[str] = None,
     ):
         # 기본 설정
@@ -68,6 +69,7 @@ class RAGAgent:
         self.chunk_overlap = chunk_overlap if chunk_overlap is not None else Config.chunk_overlap
         self.vector_store_class = vector_store_class
         self.k = k if k is not None else Config.k
+        self.ollama_temperature = ollama_temperature if ollama_temperature is not None else Config.ollama_temperature
         self.ollama_model = ollama_model_name or Config.ollama_model_name
         self.ollama_base_url = ollama_base_url or Config.ollama_base_url
         self.vector_store_path = vector_store_path or Config.vector_store_path
@@ -86,7 +88,7 @@ class RAGAgent:
         # LLM은 벡터스토어 유무와 무관하게 초기화하여 LLM-only 경로를 허용
         self.llm = ChatOllama(
             model=self.ollama_model,
-            temperature=0.1,
+            temperature=self.ollama_temperature,
             base_url=self.ollama_base_url,
             callback_manager=self.callback_manager,
         )
@@ -101,7 +103,15 @@ class RAGAgent:
     def _initialize_vector_store(self):
         """
         벡터 저장소를 로드하거나 새로 생성합니다.
-        
+
+        동작 개요:
+        - Qdrant 우선 정책: Qdrant 연결 성공 시 해당 컬렉션을 사용합니다.
+          - `Config.on_missing_vector_store == "auto_build"`이고 초기 문서 경로가 비어 있으면
+            `IngestionService.discover_files()`로 DATA_DIR을 스캔해 자동 인덱싱을 시도합니다.
+        - 예외/폴백: Qdrant 연결 실패 시 로컬 FAISS로 폴백합니다.
+          - `self.vector_store_path`가 존재하면 디스크에서 로드, 아니면 문서 경로가 있을 때 신규 생성.
+        - LLM-only 허용: 경로와 저장소 경로가 모두 없으면 검색기를 생성하지 않고 LLM-only 모드로 진행합니다.
+
         Returns:
             None
         """
@@ -138,8 +148,26 @@ class RAGAgent:
     
     def _create_vector_store_from_documents(self):
         """
-        문서들로부터 벡터 저장소를 생성합니다.
-        
+        `self.document_paths`에 지정된 데이터 소스로부터 문서를 로드·분할한 뒤
+        임베딩하여 벡터 저장소에 업서트(또는 신규 생성)합니다.
+
+        동작 개요:
+        - 입력 소스 분류: 로컬 파일과 URL을 분리 처리합니다.
+          - 파일: PDF(.pdf)은 PyMuPDF 기반 로더, 그 외 텍스트 파일은 UTF-8로 읽어 처리합니다.
+          - URL: LangChain `WebBaseLoader`로 HTTP 수집합니다(robots/속도 제한 고려 필요).
+        - 문서 분할: `IngestionService`의 `RecursiveCharacterTextSplitter`를 사용하여
+          `Config.chunk_size`와 `Config.chunk_overlap`에 따라 분할합니다.
+        - 저장소 쓰기: 
+          - Qdrant 등 원격 스토어가 이미 초기화된 경우 `add_documents`로 업서트합니다.
+          - 그렇지 않으면 로컬 FAISS 인덱스를 새로 생성합니다.
+        - 영속화: Qdrant는 원격 저장으로 별도 저장이 필요 없고,
+          FAISS 폴백일 때만 `self.vector_store_path`가 설정된 경우 디스크에 저장합니다.
+
+        주의/제약:
+        - 중복 제어를 별도로 수행하지 않습니다. 동일 문서를 반복 호출 시 중복이 발생할 수 있습니다.
+        - PDF 처리를 위해서는 `pymupdf`(PyMuPDF) 의존성이 필요합니다.
+        - 네트워크 수집은 외부 환경에 의존하므로 실패 시 예외가 전파될 수 있습니다.
+
         Returns:
             None
         """
@@ -172,8 +200,16 @@ class RAGAgent:
     def _initialize_rag_chain(self):
         """
         RAG 체인을 초기화합니다.
-        
-        - 벡터스토어가 없는 경우(LLM-only 모드) 체인 생성을 건너뜁니다.
+
+        동작 개요:
+        - 벡터스토어가 없으면 검색 체인을 구성하지 않고 LLM-only 모드로 설정합니다.
+        - 벡터스토어가 있으면 `as_retriever(k=self.k)`로 검색기를 만들고,
+          프롬프트/체인은 `ChainBuilder`를 통해 생성합니다.
+          - 수동 체인(manual): 단순 컨텍스트 주입 방식으로 `self.chain`에 설정됩니다.
+          - LCEL 체인: 리트리버 출력 → 문서 포맷팅 → LLM 호출을 연결하여 `self.lcel_chain`에 설정됩니다.
+
+        Returns:
+            None
         """
         if self.vector_store is None:
             # 벡터스토어 없으면 검색 체인을 구성하지 않음(LLM-only 모드)
@@ -208,8 +244,15 @@ class RAGAgent:
     
     def add_documents(self, document_paths: List[str]):
         """
-        새로운 문서들을 추가합니다.
-        
+        새로운 문서 경로를 추가하고 벡터 저장소에 반영한 뒤 체인을 재초기화합니다.
+
+        주의/제약:
+        - 중복 방지는 내부적으로 수행하지 않습니다. 동일 경로를 여러 번 추가하면 중복 인덱싱이 발생할 수 있습니다.
+        - 원격(Qdrant) 사용 시 `add_documents`로 업서트가 수행됩니다.
+
+        Args:
+            document_paths: 파일 경로 또는 URL 목록
+
         Returns:
             None
         """
@@ -219,10 +262,17 @@ class RAGAgent:
     
     def query(self, question: str) -> str:
         """
-        질문에 답변합니다.
-        
+        수동 컨텍스트 주입 체인으로 질의를 처리하여 답변 문자열을 반환합니다.
+
+        동작 개요:
+        - 리트리버로 관련 문서 `k`개를 조회하고, 본문을 합쳐 컨텍스트를 구성합니다.
+        - 프롬프트에 `{context, question}`을 주입하여 LLM 응답을 생성합니다.
+
+        Raises:
+            ValueError: 체인이 초기화되지 않았을 때(벡터스토어 없음 등)
+
         Returns:
-            str: 답변
+            str: LLM 응답 텍스트
         """
         if self.chain is None:
             raise ValueError("RAG 체인이 초기화되지 않았습니다.")
@@ -240,13 +290,29 @@ class RAGAgent:
         return response
 
     def query_lcel(self, question: str) -> str:
-        """리트리버를 LCEL 체인에 결합해 질의를 처리합니다."""
+        """
+        LCEL 체인(리트리버 → 문서 포맷팅 → LLM)으로 질의를 처리합니다.
+
+        Raises:
+            ValueError: LCEL 체인이 초기화되지 않은 경우
+
+        Returns:
+            str: LLM 응답 텍스트
+        """
         if self.lcel_chain is None:
             raise ValueError("LCEL 체인이 초기화되지 않았습니다.")
         return self.lcel_chain.invoke(question)
     
     def save_vector_store(self):
-        """벡터 저장소를 저장합니다 (.env의 VECTOR_STORE_PATH 필수)."""
+        """
+        로컬 벡터 저장소를 디스크에 저장합니다.
+
+        참고:
+        - Qdrant(원격) 사용 시 별도 저장이 필요 없습니다. FAISS 폴백에만 적용됩니다.
+
+        Raises:
+            ValueError: 저장 경로 미설정 또는 저장할 벡터 저장소가 없는 경우
+        """
         # Qdrant 모드에서는 별도 저장이 필요 없습니다. FAISS 폴백만 수행.
         if hasattr(self.vector_store, "save_local"):
             if not self.vector_store_path:
@@ -257,7 +323,19 @@ class RAGAgent:
             self.vector_store.save_local(self.vector_store_path)
     
     def load_vector_store(self):
-        """벡터 저장소를 로드합니다 (.env의 VECTOR_STORE_PATH 필수)."""
+        """
+        벡터 저장소를 다시 로드합니다.
+
+        동작 개요:
+        - Qdrant 시도: 원격 컬렉션 연결을 시도합니다.
+        - 폴백: 실패 시 `VECTOR_STORE_PATH`에서 FAISS 인덱스를 로드합니다.
+
+        Raises:
+            ValueError: 폴백 경로가 미설정인 경우
+
+        Returns:
+            None
+        """
         # Qdrant 모드에서는 컬렉션 연결로 충분합니다. 폴백인 경우에만 디스크에서 로딩.
         try:
             self.vector_store = VectorStoreManagerQdrant(embeddings=self.embedding_model).vs
@@ -279,29 +357,47 @@ class RAGAgent:
 
     # 증분 인덱싱을 위한 간단한 퍼블릭 API
     def add_files(self, paths: List[str]):
+        """파일 경로 목록을 추가 인덱싱합니다. URL은 허용되지 않습니다.
+
+        Args:
+            paths: 파일 시스템 경로 목록
+        """
         self.add_documents(paths)
 
     def add_urls(self, urls: List[str]):
+        """URL 목록을 추가 인덱싱합니다.
+
+        Args:
+            urls: 웹 문서 URL 목록
+        """
         self.add_documents(urls)
 
     def llm_query(self, question: str) -> str:
-        """LLM을 직접 호출하여 답변 텍스트를 반환합니다."""
+        """
+        검색 없이 LLM만 직접 호출하여 응답 텍스트를 반환합니다.
+
+        주의:
+        - 리트리버 컨텍스트가 없으므로 RAG 품질과 무관한 순수 LLM 응답입니다.
+
+        Returns:
+            str: LLM 응답 텍스트
+        """
         result = self.llm.invoke(question)
         return getattr(result, "content", str(result))
 
-# 사용 예시를 위한 헬퍼 함수들
-def create_rag_agent_from_documents(
-    document_paths: List[str],
-    embedding_model: Optional[HuggingFaceEmbeddings] = None,
-    **kwargs,
-) -> RAGAgent:
-    """문서들로부터 RAG 에이전트를 생성합니다."""
-    return RAGAgent(document_paths=document_paths, embedding_model=embedding_model, **kwargs)
+# # 사용 예시를 위한 헬퍼 함수들
+# def create_rag_agent_from_documents(
+#     document_paths: List[str],
+#     embedding_model: Optional[HuggingFaceEmbeddings] = None,
+#     **kwargs,
+# ) -> RAGAgent:
+#     """문서들로부터 RAG 에이전트를 생성합니다."""
+#     return RAGAgent(document_paths=document_paths, embedding_model=embedding_model, **kwargs)
 
 
-def create_rag_agent_from_env_vector_store(
-    embedding_model: Optional[HuggingFaceEmbeddings] = None,
-    **kwargs,
-) -> RAGAgent:
-    """.env의 VECTOR_STORE_PATH를 사용하여 RAG 에이전트를 생성합니다."""
-    return RAGAgent(embedding_model=embedding_model, **kwargs)
+# def create_rag_agent_from_env_vector_store(
+#     embedding_model: Optional[HuggingFaceEmbeddings] = None,
+#     **kwargs,
+# ) -> RAGAgent:
+#     """.env의 VECTOR_STORE_PATH를 사용하여 RAG 에이전트를 생성합니다."""
+#     return RAGAgent(embedding_model=embedding_model, **kwargs)

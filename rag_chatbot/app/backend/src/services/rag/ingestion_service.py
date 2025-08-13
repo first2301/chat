@@ -29,6 +29,15 @@ class IngestionService:
                 break
 
     def discover_files(self, data_dir: str | None = None, patterns: List[str] | None = None) -> List[str]:
+        """
+        데이터 디렉토리에서 파일을 검색하고 파일 경로를 반환합니다.
+
+        Args:
+            data_dir: 데이터 디렉토리 경로
+            patterns: 파일 패턴 목록
+
+        Returns:
+        """
         base = Path(data_dir or Config.get_data_dir())
         patterns = patterns or Config.get_doc_globs()
         results: List[str] = []

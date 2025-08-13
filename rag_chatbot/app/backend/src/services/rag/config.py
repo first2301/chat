@@ -63,6 +63,7 @@ class Config:
     # Ollama 설정
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     ollama_model_name: str = os.getenv("OLLAMA_MODEL", "ko-llama-8B")
+    ollama_temperature: float = float(os.getenv("OLLAMA_TEMPERATURE", 0.1))
 
     # 벡터 저장소 설정 (FAISS 경로: 하위호환용; Qdrant 전환 시 미사용)
     vector_store_path: Optional[str] = os.getenv("VECTOR_STORE_PATH")
@@ -218,6 +219,10 @@ class Config:
     def set_ollama_settings(cls, base_url: str, model_name: str):
         cls.ollama_base_url = base_url
         cls.ollama_model_name = model_name
+
+    @classmethod
+    def set_ollama_temperature(cls, temperature: float):
+        cls.ollama_temperature = temperature
 
     @classmethod
     def set_vector_store_path(cls, path: str):

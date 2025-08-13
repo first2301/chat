@@ -16,8 +16,13 @@ from backend.src.services.rag.config import Config
 async def lifespan_context(app: FastAPI):
     """FastAPI lifespan 컨텍스트.
 
-    앱 시작 시 RAG 에이전트를 생성하고 가능한 경우 벡터스토어를 로드합니다.
-    실패하면 `app.state.agent`는 None으로 설정되어, 라우터에서 503을 반환하도록 합니다.
+    동작 개요:
+    - 환경변수 로드(`.env/.env.dev/.env.prod.dev` 탐색) 및 경로 해석/검증
+    - `RAGAgent` 생성(Qdrant 우선, 미존재 시 자동 인덱싱 정책 적용 가능)
+    - 앱 상태에 에이전트 바인딩(`app.state.agent`)
+
+    예외 처리:
+    - 초기화 실패 시에도 앱은 기동하며, 의존성에서 503을 반환할 수 있습니다.
     """
     # 환경 로드/경로 해석/검증
     Config.load_env()
