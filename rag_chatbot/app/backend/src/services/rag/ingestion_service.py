@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 from typing import List
 
 from langchain_community.document_loaders import WebBaseLoader, PyMuPDFLoader
@@ -56,7 +57,24 @@ class IngestionService:
         from langchain_core.documents import Document
 
         documents = []
-        for path in paths:
+        file_list: List[str] = []
+
+        # 디렉터리 경로가 섞여 들어올 수 있으므로 파일 목록으로 확장
+        for raw in paths:
+            p = Path(raw)
+            if p.is_dir():
+                # 지정 디렉터리 하위에서 허용 글롭만 재귀 탐색
+                for pattern in Config.get_doc_globs():
+                    for f in p.glob(pattern):
+                        if f.is_file():
+                            file_list.append(str(f))
+            elif p.is_file():
+                file_list.append(str(p))
+            else:
+                # 존재하지 않거나 접근 불가 경로는 건너뜀
+                continue
+
+        for path in sorted(list(dict.fromkeys(file_list))):
             if path.lower().endswith(".pdf"):
                 loader = PyMuPDFLoader(path)
                 documents.extend(loader.load())

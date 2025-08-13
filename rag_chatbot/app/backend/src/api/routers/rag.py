@@ -42,6 +42,9 @@ def rag_query(req: QueryRequest, agent: RAGAgent = Depends(get_agent)):
 def rag_reload(agent: RAGAgent = Depends(get_agent)):
     """벡터스토어를 다시 로드합니다.
 
+    Args:
+        agent: 의존성 주입된 `RAGAgent`
+
     Returns:
         dict: {"status": "reloaded"}
     """
@@ -51,6 +54,10 @@ def rag_reload(agent: RAGAgent = Depends(get_agent)):
 @router.post("/test_query/{question}")
 def test_query(question: str, agent: RAGAgent = Depends(get_agent)):
     """검색 없이 LLM만 직접 호출해 간단 응답을 확인합니다.
+
+    Args:
+        question: 질문 텍스트(경로 파라미터)
+        agent: 의존성 주입된 `RAGAgent`
 
     Returns:
         dict: {"answer": str}
@@ -67,6 +74,10 @@ def index_files(req: IndexFilesRequest, agent: RAGAgent = Depends(get_agent)):
         - 도커 환경: 컨테이너 내부 경로를 `paths`로 전달하세요(예: "/app/data/a.pdf").
         - `force_rebuild`는 현재 드롭 없이 업서트만 수행합니다.
 
+    Args:
+        req: 파일 인덱싱 요청(`paths`, `globs`, `force_rebuild`)
+        agent: 의존성 주입된 `RAGAgent`
+
     paths:
         - app/data/pdf
         - 필요에 따라 app/data 경로에 추가 파일 추가
@@ -81,7 +92,7 @@ def index_files(req: IndexFilesRequest, agent: RAGAgent = Depends(get_agent)):
         agent.add_files(req.paths)
     else:
         # 경로 미제공 시 DATA_DIR + DOC_GLOBS 스캔
-        discovered = agent._discover_documents_from_data_dir()
+        discovered = agent.ingestion.discover_files()
         if discovered:
             agent.add_files(discovered)
     return {"status": "ok"}
@@ -114,6 +125,10 @@ def index_text(req: IndexTextRequest, agent: RAGAgent = Depends(get_agent)):
     사용 방법:
         - `texts`: 원문 텍스트 리스트. 각 항목이 분할→임베딩→업서트됩니다.
         - `source`: 각 텍스트의 메타데이터 `source` 라벨(예: "inline", "ticket-123").
+
+    Args:
+        req: 텍스트 인덱싱 요청(`texts`, 선택적 `source`)
+        agent: 의존성 주입된 `RAGAgent`
 
     texts:
         - 원문 텍스트 리스트

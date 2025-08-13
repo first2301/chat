@@ -6,6 +6,7 @@
 from fastapi import FastAPI
 from backend.src.api.routers import health as health_router
 from backend.src.api.routers import rag as rag_router
+from backend.src.api.routers import qdrant_admin as qdrant_admin_router
 from backend.src.api.lifespan import lifespan_context
 
 
@@ -19,7 +20,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="RAG Service", lifespan=lifespan_context)
     app.include_router(health_router.router)
     app.include_router(rag_router.router)
-
+    app.include_router(qdrant_admin_router.router)
     return app
 
 
