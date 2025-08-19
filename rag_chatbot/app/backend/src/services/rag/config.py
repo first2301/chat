@@ -72,6 +72,9 @@ class Config:
     qdrant_url: str = os.getenv("QDRANT_URL", "http://localhost:6333")
     qdrant_api_key: Optional[str] = os.getenv("QDRANT_API_KEY")
     qdrant_collection: str = os.getenv("QDRANT_COLLECTION", "rag_collection")
+    qdrant_timeout: float = float(os.getenv("QDRANT_TIMEOUT", 30))
+    qdrant_connect_retries: int = int(os.getenv("QDRANT_CONNECT_RETRIES", 20))
+    qdrant_connect_retry_interval: float = float(os.getenv("QDRANT_CONNECT_RETRY_INTERVAL", 1.5))
 
     # 데이터 소스/자동 인덱싱 설정
     data_dir: str = os.getenv("DATA_DIR", "app/data")

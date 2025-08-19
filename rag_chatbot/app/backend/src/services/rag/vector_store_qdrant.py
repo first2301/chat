@@ -37,9 +37,11 @@ class VectorStoreManagerQdrant:
             qdrant_url: Optional[str] = None,
             qdrant_api_key: Optional[str] = None,
     ):
+        # 연결 지연을 고려해 타임아웃/재시도 포함 클라이언트 생성
         self.client = QdrantClient(
             url=qdrant_url if qdrant_url is not None else Config.qdrant_url,
             api_key=qdrant_api_key if qdrant_api_key is not None else Config.qdrant_api_key,
+            timeout=Config.qdrant_timeout,
         )
         self.collection = collection or Config.qdrant_collection
         self.embeddings = embeddings
@@ -55,11 +57,19 @@ class VectorStoreManagerQdrant:
         Raises:
             RuntimeError: 임베딩 차원 추론 실패 시
         """
-        try:
-            self.client.get_collection(self.collection)
-            return
-        except Exception:
-            pass
+        # Qdrant가 부팅 중일 수 있으므로 제한적 재시도
+        import time
+        retries = max(0, Config.qdrant_connect_retries)
+        interval = max(0.1, Config.qdrant_connect_retry_interval)
+        for attempt in range(retries + 1):
+            try:
+                self.client.get_collection(self.collection)
+                return
+            except Exception:
+                if attempt < retries:
+                    time.sleep(interval)
+                else:
+                    break
         # 임베딩 차원 계산 후 컬렉션 생성
         try:
             dim = len(self.embeddings.embed_query("dimension probe"))
