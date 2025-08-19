@@ -2,9 +2,9 @@
 
 - 문서로부터 벡터 저장소를 구성하고, 리트리버-LLM 체인으로 질의를 처리합니다.
 - 수동 컨텍스트 주입 체인과 LCEL 결합 체인을 모두 제공합니다.
+- Qdrant 전용 벡터 스토어를 사용합니다.
 """
 
-from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import ChatOllama
 from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHandler
@@ -24,61 +24,31 @@ class RAGAgent:
         embedding_model: 사전 생성된 임베딩 모델(미지정 시 Config에서 생성)
         chunk_size: 분할 크기(None이면 Config 값)
         chunk_overlap: 분할 중복 크기(None이면 Config 값)
-        vector_store_class: 벡터 저장소 클래스(기본 FAISS)
         k: 검색 상위 k개(None이면 Config 값)
         ollama_base_url: Ollama 서버 URL(None이면 Config 값)
         ollama_model_name: Ollama 모델 이름(None이면 Config 값)
-        vector_store_path: 벡터 저장소 경로(None이면 Config 값)
 
     Raises:
-        ValueError: 벡터 저장소 경로와 문서가 모두 없는 경우(옵션 B 정책)
+        RuntimeError: Qdrant 벡터 스토어 초기화 실패 시
     """
-    """
-    RAG 에이전트: 문서로부터 벡터 저장소를 구성하고, 리트리버-LLM 체인으로 질의를 처리합니다.
     
-    Args:
-        document_paths: 문서 경로들
-        embedding_model: 임베딩 모델
-        chunk_size: 문서 분할 크기
-        chunk_overlap: 문서 분할 중복 크기
-        vector_store_class: 벡터 저장소 클래스
-        k: 검색 결과 수
-        ollama_base_url: Ollama 서버 URL
-        ollama_model: Ollama 모델 이름
-        vector_store_path: 벡터 저장소 경로
-        
-    Raises:
-        ValueError: 벡터 저장소가 초기화되지 않았을 때 발생
-    """
     def __init__(
-        self,
-        document_paths: Optional[List[str]] = None,
-        embedding_model: Optional[HuggingFaceEmbeddings] = None,
-        chunk_size: Optional[int] = None,
-        chunk_overlap: Optional[int] = None,
-        vector_store_class=FAISS,
-        k: Optional[int] = None,
-        ollama_base_url: Optional[str] = None,
-        ollama_model_name: Optional[str] = None,
-        ollama_temperature: Optional[float] = None,
-        vector_store_path: Optional[str] = None,
+        self
     ):
         # 기본 설정
-        self.document_paths = document_paths or []
-        self.chunk_size = chunk_size if chunk_size is not None else Config.chunk_size
-        self.chunk_overlap = chunk_overlap if chunk_overlap is not None else Config.chunk_overlap
-        self.vector_store_class = vector_store_class
-        self.k = k if k is not None else Config.k
-        self.ollama_temperature = ollama_temperature if ollama_temperature is not None else Config.ollama_temperature
-        self.ollama_model = ollama_model_name or Config.ollama_model_name
-        self.ollama_base_url = ollama_base_url or Config.ollama_base_url
-        self.vector_store_path = vector_store_path or Config.vector_store_path
+        self.document_paths = []
+        self.chunk_size = Config.chunk_size
+        self.chunk_overlap = Config.chunk_overlap
+        self.k = Config.k
+        self.ollama_temperature = Config.ollama_temperature
+        self.ollama_model = Config.ollama_model_name
+        self.ollama_base_url = Config.ollama_base_url
         
         # 콜백 매니저
         self.callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
         
         # 임베딩 모델 초기화
-        self.embedding_model = embedding_model or Config.get_embedding_model()
+        self.embedding_model = Config.get_embedding_model()
         
         # 컴포넌트들 초기화
         self.vector_store = None
@@ -105,17 +75,15 @@ class RAGAgent:
         벡터 저장소를 로드하거나 새로 생성합니다.
 
         동작 개요:
-        - Qdrant 우선 정책: Qdrant 연결 성공 시 해당 컬렉션을 사용합니다.
+        - Qdrant 전용 정책: Qdrant 연결 성공 시 해당 컬렉션을 사용합니다.
           - `Config.on_missing_vector_store == "auto_build"`이고 초기 문서 경로가 비어 있으면
             `IngestionService.discover_files()`로 DATA_DIR을 스캔해 자동 인덱싱을 시도합니다.
-        - 예외/폴백: Qdrant 연결 실패 시 로컬 FAISS로 폴백합니다.
-          - `self.vector_store_path`가 존재하면 디스크에서 로드, 아니면 문서 경로가 있을 때 신규 생성.
-        - LLM-only 허용: 경로와 저장소 경로가 모두 없으면 검색기를 생성하지 않고 LLM-only 모드로 진행합니다.
+        - Qdrant 연결 실패 시 적절한 에러 메시지 제공
 
         Returns:
             None
         """
-        # Qdrant 우선 사용: 컬렉션 존재/비어있음 정책에 따라 처리
+        # Qdrant 전용 사용: 컬렉션 존재/비어있음 정책에 따라 처리
         try:
             self.vector_store = VectorStoreManagerQdrant(embeddings=self.embedding_model).vs
             # 컬렉션이 없으면 생성 시도. langchain Qdrant 래퍼는 호출 시 자동 생성 지원.
@@ -125,31 +93,14 @@ class RAGAgent:
                 if discovered:
                     self.document_paths = discovered
                     self._create_vector_store_from_documents()
-        except Exception:
-            # Qdrant 연결 실패 시 기존 FAISS 경로(하위호환)로 폴백
-            if not self.vector_store_path and not self.document_paths:
-                # LLM-only 허용
-                return
-            if self.vector_store_path and os.path.exists(self.vector_store_path):
-                try:
-                    self.vector_store = self.vector_store_class.load_local(
-                        self.vector_store_path,
-                        self.embedding_model,
-                        allow_dangerous_deserialization=True,
-                    )
-                except TypeError:
-                    self.vector_store = self.vector_store_class.load_local(
-                        self.vector_store_path,
-                        self.embedding_model,
-                    )
-            else:
-                if self.document_paths:
-                    self._create_vector_store_from_documents()
+        except Exception as e:
+            # Qdrant 전용 모드이므로 폴백 없이 에러 전파
+            raise RuntimeError(f"Qdrant 벡터 스토어 초기화 실패: {e}")
     
     def _create_vector_store_from_documents(self):
         """
         `self.document_paths`에 지정된 데이터 소스로부터 문서를 로드·분할한 뒤
-        임베딩하여 벡터 저장소에 업서트(또는 신규 생성)합니다.
+        임베딩하여 벡터 저장소에 업서트합니다.
 
         동작 개요:
         - 입력 소스 분류: 로컬 파일과 URL을 분리 처리합니다.
@@ -157,11 +108,7 @@ class RAGAgent:
           - URL: LangChain `WebBaseLoader`로 HTTP 수집합니다(robots/속도 제한 고려 필요).
         - 문서 분할: `IngestionService`의 `RecursiveCharacterTextSplitter`를 사용하여
           `Config.chunk_size`와 `Config.chunk_overlap`에 따라 분할합니다.
-        - 저장소 쓰기: 
-          - Qdrant 등 원격 스토어가 이미 초기화된 경우 `add_documents`로 업서트합니다.
-          - 그렇지 않으면 로컬 FAISS 인덱스를 새로 생성합니다.
-        - 영속화: Qdrant는 원격 저장으로 별도 저장이 필요 없고,
-          FAISS 폴백일 때만 `self.vector_store_path`가 설정된 경우 디스크에 저장합니다.
+        - 저장소 쓰기: Qdrant 벡터 스토어에 `add_documents`로 업서트합니다.
 
         주의/제약:
         - 중복 제어를 별도로 수행하지 않습니다. 동일 문서를 반복 호출 시 중복이 발생할 수 있습니다.
@@ -183,17 +130,11 @@ class RAGAgent:
         # 텍스트 분할
         split_docs = self.ingestion.split(documents)
         
-        # Qdrant가 초기화되어 있으면 업서트, 아니면 로컬 FAISS 생성
+        # Qdrant 벡터 스토어에 문서 추가
         if self.vector_store is not None and hasattr(self.vector_store, "add_documents"):
             self.vector_store.add_documents(split_docs)
         else:
-            self.vector_store = self.vector_store_class.from_documents(
-                split_docs, 
-                self.embedding_model
-            )
-            # Qdrant는 원격 저장이므로 별도 저장 불필요. FAISS 폴백일 때만 저장.
-            if self.vector_store_path and hasattr(self.vector_store, "save_local"):
-                self.vector_store.save_local(self.vector_store_path)
+            raise RuntimeError("Qdrant 벡터 스토어가 초기화되지 않았습니다.")
     
     # 로더/스플리터/발견은 전담 컴포넌트가 담당
     
@@ -305,54 +246,39 @@ class RAGAgent:
     
     def save_vector_store(self):
         """
-        로컬 벡터 저장소를 디스크에 저장합니다.
+        벡터 저장소를 저장합니다.
 
         참고:
-        - Qdrant(원격) 사용 시 별도 저장이 필요 없습니다. FAISS 폴백에만 적용됩니다.
+        - Qdrant(원격) 사용 시 별도 저장이 필요 없습니다.
+        - 이 메서드는 Qdrant 전용 모드에서는 동작하지 않습니다.
 
         Raises:
-            ValueError: 저장 경로 미설정 또는 저장할 벡터 저장소가 없는 경우
+            RuntimeError: Qdrant 전용 모드에서는 사용할 수 없습니다.
         """
-        # Qdrant 모드에서는 별도 저장이 필요 없습니다. FAISS 폴백만 수행.
-        if hasattr(self.vector_store, "save_local"):
-            if not self.vector_store_path:
-                raise ValueError("VECTOR_STORE_PATH가 설정되지 않았습니다. .env에 경로를 지정하세요.")
-            if self.vector_store is None:
-                raise ValueError("저장할 벡터 저장소가 없습니다.")
-            os.makedirs(self.vector_store_path, exist_ok=True)
-            self.vector_store.save_local(self.vector_store_path)
+        # Qdrant 전용 모드에서는 별도 저장이 필요 없습니다.
+        raise RuntimeError("Qdrant 전용 모드에서는 save_vector_store를 사용할 수 없습니다. Qdrant는 자동으로 데이터를 저장합니다.")
     
     def load_vector_store(self):
         """
         벡터 저장소를 다시 로드합니다.
 
         동작 개요:
-        - Qdrant 시도: 원격 컬렉션 연결을 시도합니다.
-        - 폴백: 실패 시 `VECTOR_STORE_PATH`에서 FAISS 인덱스를 로드합니다.
+        - Qdrant 전용: 원격 컬렉션 연결을 시도합니다.
+        - Qdrant 연결 실패 시 적절한 에러 메시지 제공
 
         Raises:
-            ValueError: 폴백 경로가 미설정인 경우
+            RuntimeError: Qdrant 연결 실패 시
 
         Returns:
             None
         """
-        # Qdrant 모드에서는 컬렉션 연결로 충분합니다. 폴백인 경우에만 디스크에서 로딩.
         try:
+            # Qdrant 연결 시도
             self.vector_store = VectorStoreManagerQdrant(embeddings=self.embedding_model).vs
-        except Exception:
-            if not self.vector_store_path:
-                raise ValueError("VECTOR_STORE_PATH가 설정되지 않았습니다. .env에 경로를 지정하세요.")
-            try:
-                self.vector_store = self.vector_store_class.load_local(
-                    self.vector_store_path,
-                    self.embedding_model,
-                    allow_dangerous_deserialization=True,
-                )
-            except TypeError:
-                self.vector_store = self.vector_store_class.load_local(
-                    self.vector_store_path,
-                    self.embedding_model,
-                )
+        except Exception as e:
+            # Qdrant 연결 실패 시 적절한 에러 처리
+            raise RuntimeError(f"Qdrant 연결 실패: {e}. Qdrant 서비스 상태를 확인하세요.")
+        
         self._initialize_rag_chain()
 
     # 증분 인덱싱을 위한 간단한 퍼블릭 API

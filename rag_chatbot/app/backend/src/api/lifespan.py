@@ -7,6 +7,7 @@
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+import logging
 
 from backend.src.services.rag.rag_agent import RAGAgent
 from backend.src.services.rag.config import Config
@@ -30,13 +31,12 @@ async def lifespan_context(app: FastAPI):
     Config.validate()
 
     # 에이전트 초기화 후, 필요 시 벡터스토어 보장(자동 인덱싱 가능)
-    agent = RAGAgent()
     try:
-        # Qdrant 연결 기반이므로 load_vector_store 대신 초기화된 상태 사용
-        # 자동 인덱싱 정책(auto_build)이면 내부에서 처리됨
-        _ = agent
-    except Exception:
-        pass
+        agent = RAGAgent()
+    except Exception as e:
+        # 초기화 실패 시에도 앱은 기동. 의존성에서 503 반환됨
+        logging.exception("Failed to initialize RAGAgent during lifespan: %s", e)
+        agent = None
     app.state.agent = agent
     yield
     # 종료 시 정리 필요하면 여기에 추가

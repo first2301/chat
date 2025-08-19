@@ -1,9 +1,10 @@
 services:
   # Ollama 서버
   ollama:
-    image: ollama/ollama:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
     container_name: rnd_ollama
-    command: serve
     environment:
       - OLLAMA_HOST=0.0.0.0
     ports:
@@ -11,9 +12,7 @@ services:
     networks:
       - rag-network
     volumes:
-      - ./app/ollama_server:/root/.ollama
-      - ./app/ai_models:/root/.ollama/ai_models
-      - ./app/ollama_server/Modelfile:/root/.ollama/Modelfile
+      - ./app/ollama_data:/root/.ollama
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s
@@ -39,18 +38,18 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.cpu
-    container_name: rag-backend
+    container_name: rnd_rag
     environment:
-      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_URL=http://rnd_qdrant:6333
       - QDRANT_COLLECTION=rag_collection
       - DATA_DIR=/app/data
       - EMBEDDING_MODEL_NAME=/app/embedding_models/BGE-m3-ko
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_BASE_URL=http://rnd_ollama:11434
       - OLLAMA_MODEL=ko-llama-8B
     volumes:
       - ./app/backend:/app/backend
-      - ./app/embedding_models:/app/embedding_models:ro
-      - ./app/data:/app/data:ro
+      - ./app/embedding_models:/app/embedding_models
+      - ./app/data:/app/data
     networks:
       - rag-network
     ports:

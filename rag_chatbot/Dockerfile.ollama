@@ -1,0 +1,13 @@
+FROM ollama/ollama:0.11.5-rc3
+
+# curl 설치 (헬스체크용)
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+COPY ./app/ollama_data/Modelfile/ /root/.ollama/Modelfile/
+
+# 시작 스크립트 복사
+COPY ./app/start.sh /start.sh
+RUN chmod +x /start.sh
+
+# 시작 스크립트 실행
+ENTRYPOINT ["/start.sh"]

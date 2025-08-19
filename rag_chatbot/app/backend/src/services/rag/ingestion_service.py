@@ -21,13 +21,6 @@ class IngestionService:
             is_separator_regex=False,
             separators=["\n\n", "\n", " ", ""],
         )
-        # 프로젝트 루트 디렉토리 계산 ("rag_chatbot" 또는 "backend" 어느 쪽이든 인식)
-        here = Path(__file__).resolve()
-        self._rag_root = here
-        for parent in [here] + list(here.parents):
-            if parent.name in ("rag_chatbot", "backend"):
-                self._rag_root = parent
-                break
 
     def discover_files(self, data_dir: str | None = None, patterns: List[str] | None = None) -> List[str]:
         """
@@ -39,16 +32,17 @@ class IngestionService:
 
         Returns:
         """
-        base = Path(data_dir or Config.get_data_dir())
+        # DATA_DIR 내부에서만 스캔하도록 기준 디렉터리를 엄격히 고정합니다.
+        base = Path(data_dir or Config.get_data_dir()).resolve()
         patterns = patterns or Config.get_doc_globs()
         results: List[str] = []
         for pattern in patterns:
             for p in base.glob(pattern):
                 if p.is_file():
+                    # 안전 장치: 반드시 DATA_DIR 하위인 경우에만 포함
                     try:
-                        p.resolve().relative_to(self._rag_root)
+                        p.resolve().relative_to(base)
                     except Exception:
-                        # rag_chatbot 외부는 무시
                         continue
                     results.append(str(p.resolve()))
         return sorted(list(dict.fromkeys(results)))
@@ -79,7 +73,8 @@ class IngestionService:
                 loader = PyMuPDFLoader(path)
                 documents.extend(loader.load())
             else:
-                with open(path, "r", encoding="utf-8") as f:
+                # 일부 파일의 인코딩 문제가 전체 파이프라인을 중단하지 않도록 안전하게 로드
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
                     documents.append(Document(page_content=f.read(), metadata={"source": path}))
         return documents
 

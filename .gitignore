@@ -47,5 +47,5 @@ embedding_models/
 vector_stores/
 vector_data/
 ai_models/
-ollama_server/
+ollama_data/
 
