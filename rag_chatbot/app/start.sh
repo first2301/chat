@@ -1,40 +1,49 @@
-#!/bin/bash
-set -e  # 에러 발생 시 스크립트 즉시 종료 (안전한 실행을 위해 사용)
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# start.sh
+# - 컨테이너 기동 시 Ollama API 서버를 실행하고,
+#   대상 모델(ko-llama-8B)이 없으면 Modelfile로 생성한 뒤
+#   서버 프로세스를 포그라운드로 유지합니다.
+#
+# 사용 전제
+# - Modelfile 경로: /root/.ollama/Modelfile/ko-llama-8B
+# - 내부 통신 포트: 11434 (localhost 기준)
+# - 이미지에 Modelfile이 COPY되어 있어야 함
+# -----------------------------------------------------------------------------
 
-# ---------------------------------------------------------
-# Ollama 서버 실행 (백그라운드)
-# - ollama serve : Ollama API 서버 실행
-# - & : 백그라운드 실행
-# - $! : 마지막으로 실행된 백그라운드 프로세스의 PID를 의미
-#   → 나중에 wait로 이 프로세스를 따라가기 위해 저장
-# ---------------------------------------------------------
-ollama serve &
-PID=$!
+# 엄격 모드
+# -e: 명령 실패 시 즉시 종료
+# -u: 정의되지 않은 변수 사용 시 에러
+# -o pipefail: 파이프라인 중간 실패도 감지
+set -euo pipefail
 
-# ---------------------------------------------------------
-# Ollama API 준비 상태 확인 (헬스체크 루프)
-# - curl -s : 조용히 HTTP 요청 보내기
-# - http://localhost:11434/api/tags : Ollama 상태 확인용 API
-# - >/dev/null : 출력은 버림
-# - until ... ; do ... done : 요청이 성공할 때까지 반복 실행
-# ---------------------------------------------------------
-until curl -s http://localhost:11434/api/tags >/dev/null; do
-    echo "Waiting for Ollama..."
-    sleep 2  # 2초 대기 후 재시도
+# 1) Ollama API 서버 백그라운드 실행
+#  - & 로 백그라운드 실행하고, $! 에 PID 저장
+ollama serve & PID=$!
+
+# 2) API 준비 대기
+#  - /api/tags 엔드포인트로 서버 준비 상태 폴링
+#  - 성공할 때까지 2초 간격으로 재시도
+until ollama list >/dev/null 2>&1; do
+  echo "[start.sh] Waiting for Ollama API on :11434 ..."
+  sleep 2
 done
+# 3) 모델 존재 확인 후, 없으면 Modelfile로 생성
+#  - ollama list 출력에서 정확히 'ko-llama-8B'가 있는지 검사
+#  - -f 인자는 '파일 경로'여야 하므로 디렉터리가 아닌 실제 Modelfile 지정
+if ! ollama list | grep -q "^ko-llama-8B"; then
+  echo "[start.sh] Model 'ko-llama-8B' not found. Creating from Modelfile..."
+  ollama create ko-llama-8B -f /root/.ollama/Modelfile/ko-llama-8B
+fi
 
-# ---------------------------------------------------------
-# 모델 생성 (최초 1회)
-# - ollama create <모델이름> -f <Modelfile 경로>
-#   → Modelfile을 읽어 모델 빌드/등록
-# - || true : 이미 모델이 존재하면 에러가 발생해도 무시하고 계속 진행
-#   (set -e 옵션 때문에 반드시 필요)
-# ---------------------------------------------------------
-ollama create ko-llama-8B -f /root/.ollama/Modelfile || true
+# 4) 모델 등록 완료 대기
+#  - 생성/등록이 완료될 때까지 1초 간격 폴링
+until ollama list | grep -q "^ko-llama-8B"; do
+  echo "[start.sh] Waiting for model registration 'ko-llama-8B' ..."
+  sleep 1
+done
+echo "[start.sh] Model 'ko-llama-8B' is ready."
 
-# ---------------------------------------------------------
-# Ollama 서버를 포그라운드로 유지
-# - wait <PID> : 앞서 실행한 Ollama 서버 프로세스가 종료될 때까지 기다림
-# - 컨테이너의 메인 프로세스가 Ollama 서버가 되도록 보장
-# ---------------------------------------------------------
+# 5) 서버 프로세스를 포그라운드로 유지
+#  - 컨테이너의 메인 프로세스로 ollama serve 를 유지
 wait $PID

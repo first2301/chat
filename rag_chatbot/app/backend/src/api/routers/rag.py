@@ -4,7 +4,7 @@
 - reload: 벡터스토어 재로딩
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from backend.src.services.rag.rag_agent import RAGAgent
 from backend.src.api.schemas.rag import (
     QueryRequest,
@@ -50,6 +50,20 @@ def rag_reload(agent: RAGAgent = Depends(get_agent)):
     """
     agent.load_vector_store()
     return {"status": "reloaded"}
+
+
+@router.post("/bootstrap")
+def rag_bootstrap(request: Request):
+    """에이전트가 없는 경우에만 재생성합니다.
+
+    Returns:
+        dict: {"status": "bootstrapped" | "skipped"}
+    """
+    if getattr(request.app.state, "agent", None) is None:
+        # 지연 초기화: 환경 로드/경로 해석이 lifespan에서 이미 호출되었다고 가정
+        request.app.state.agent = RAGAgent()
+        return {"status": "bootstrapped"}
+    return {"status": "skipped"}
 
 @router.post("/test_query/{question}")
 def test_query(question: str, agent: RAGAgent = Depends(get_agent)):

@@ -5,12 +5,9 @@
 - Qdrant 전용 벡터 스토어를 사용합니다.
 """
 
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import ChatOllama
 from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHandler
-from langchain_core.runnables import Runnable, RunnablePassthrough
-from typing import List, Optional
-import os
+from typing import List
 from backend.src.services.rag.config import Config
 from backend.src.services.rag.ingestion_service import IngestionService
 from backend.src.services.rag.vector_store_qdrant import VectorStoreManagerQdrant
@@ -129,10 +126,17 @@ class RAGAgent:
         
         # 텍스트 분할
         split_docs = self.ingestion.split(documents)
-        
-        # Qdrant 벡터 스토어에 문서 추가
+
+        # Qdrant 벡터 스토어에 배치로 문서 추가
         if self.vector_store is not None and hasattr(self.vector_store, "add_documents"):
-            self.vector_store.add_documents(split_docs)
+            batch_size = getattr(Config, "upsert_batch_size", 200)
+            if batch_size and batch_size > 0:
+                for i in range(0, len(split_docs), batch_size):
+                    batch = split_docs[i:i + batch_size]
+                    if batch:
+                        self.vector_store.add_documents(batch)
+            else:
+                self.vector_store.add_documents(split_docs)
         else:
             raise RuntimeError("Qdrant 벡터 스토어가 초기화되지 않았습니다.")
     

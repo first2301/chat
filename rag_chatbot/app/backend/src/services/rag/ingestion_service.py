@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import os
 from typing import List
+import re
 
 from langchain_community.document_loaders import WebBaseLoader, PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -21,6 +22,7 @@ class IngestionService:
             is_separator_regex=False,
             separators=["\n\n", "\n", " ", ""],
         )
+        self._url_line_regex = re.compile(r"^https?://\S+$", re.IGNORECASE)
 
     def discover_files(self, data_dir: str | None = None, patterns: List[str] | None = None) -> List[str]:
         """
@@ -72,6 +74,25 @@ class IngestionService:
             if path.lower().endswith(".pdf"):
                 loader = PyMuPDFLoader(path)
                 documents.extend(loader.load())
+            elif path.lower().endswith(".txt"):
+                # URL 목록 파일 규칙: 디렉터리명이 urls 또는 파일명이 *.url.txt / *.urls.txt
+                p_obj = Path(path)
+                is_url_dir = any(seg.lower() == "urls" for seg in p_obj.parts)
+                is_url_suffix = p_obj.name.lower().endswith((".url.txt", ".urls.txt"))
+                if is_url_dir or is_url_suffix:
+                    # 줄 단위로 URL만 추출하여 웹 수집으로 전환
+                    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                        url_lines = [ln.strip() for ln in f.readlines()]
+                    urls = [ln for ln in url_lines if ln and self._url_line_regex.match(ln)]
+                    if urls:
+                        # 중복 제거 및 순서 안정화
+                        urls = sorted(list(dict.fromkeys(urls)))
+                        documents.extend(self.load_urls(urls))
+                        continue
+                    # URL이 하나도 없으면 일반 텍스트로 폴백
+                # 일반 텍스트 처리
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    documents.append(Document(page_content=f.read(), metadata={"source": path}))
             else:
                 # 일부 파일의 인코딩 문제가 전체 파이프라인을 중단하지 않도록 안전하게 로드
                 with open(path, "r", encoding="utf-8", errors="ignore") as f:

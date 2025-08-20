@@ -61,7 +61,7 @@ class Config:
     k: int = int(os.getenv("K", 20))
 
     # Ollama 설정
-    ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://rnd_ollama:11434")
     ollama_model_name: str = os.getenv("OLLAMA_MODEL", "ko-llama-8B")
     ollama_temperature: float = float(os.getenv("OLLAMA_TEMPERATURE", 0.1))
 
@@ -69,8 +69,8 @@ class Config:
     vector_store_path: Optional[str] = os.getenv("VECTOR_STORE_PATH")
 
     # Qdrant 설정
-    qdrant_url: str = os.getenv("QDRANT_URL", "http://localhost:6333")
-    qdrant_api_key: Optional[str] = os.getenv("QDRANT_API_KEY")
+    qdrant_url: str = os.getenv("QDRANT_URL", "http://rnd_qdrant:6333")
+    # qdrant_api_key: Optional[str] = os.getenv("QDRANT_API_KEY")
     qdrant_collection: str = os.getenv("QDRANT_COLLECTION", "rag_collection")
     qdrant_timeout: float = float(os.getenv("QDRANT_TIMEOUT", 30))
     qdrant_connect_retries: int = int(os.getenv("QDRANT_CONNECT_RETRIES", 20))
@@ -80,8 +80,13 @@ class Config:
     data_dir: str = os.getenv("DATA_DIR", "app/data")
     doc_globs_raw: str = os.getenv("DOC_GLOBS", "**/*.pdf,**/*.txt")
     on_missing_vector_store: str = os.getenv(
-        "ON_MISSING_VECTOR_STORE", "auto_build"
-    )  # auto_build | fail | llm_only
+        "ON_MISSING_VECTOR_STORE", "llm_only"
+    )  # auto_build | fail | llm_only (기본값을 보수적으로 변경)
+
+    # URL 목록 파일 규칙 및 배치 업서트 설정
+    url_file_dirs_raw: str = os.getenv("URL_FILE_DIRS", "app/data/urls")
+    url_file_suffixes_raw: str = os.getenv("URL_FILE_SUFFIXES", ".url.txt")
+    upsert_batch_size: int = int(os.getenv("UPSERT_BATCH_SIZE", 200))
 
     @classmethod
     def load_env(cls, env_file: Optional[str] = None) -> None:
@@ -204,6 +209,18 @@ class Config:
         """문서 탐색 글롭 패턴 목록을 반환합니다."""
         patterns = [g.strip() for g in cls.doc_globs_raw.split(",") if g.strip()]
         return patterns or ["**/*.pdf", "**/*.txt"]
+
+    @classmethod
+    def get_url_file_dirs(cls) -> list[str]:
+        """URL 목록 파일 디렉터리 목록."""
+        items = [g.strip() for g in cls.url_file_dirs_raw.split(",") if g.strip()]
+        return items
+
+    @classmethod
+    def get_url_file_suffixes(cls) -> list[str]:
+        """URL 목록 파일 접미사 목록(예: .url.txt)."""
+        items = [g.strip() for g in cls.url_file_suffixes_raw.split(",") if g.strip()]
+        return items or [".url.txt"]
 
     @classmethod
     def set_embedding_model_name(cls, model_name: str):

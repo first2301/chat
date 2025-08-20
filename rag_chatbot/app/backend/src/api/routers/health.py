@@ -5,6 +5,7 @@
 """
 
 from fastapi import APIRouter, Request
+from qdrant_client import QdrantClient
 from backend.src.services.rag.config import Config
 
 router = APIRouter()
@@ -17,9 +18,28 @@ def healthz(request: Request):
     Returns:\n
         dict: 벡터스토어 로드 여부 및 핵심 설정 값
     """
-    agent_loaded = getattr(request.app.state, "agent", None) is not None
+    agent = getattr(request.app.state, "agent", None)
+    agent_loaded = agent is not None
+    qdrant_ok = None
+    collection_exists = None
+    try:
+        client = QdrantClient(url=Config.qdrant_url, api_key=Config.qdrant_api_key, timeout=Config.qdrant_timeout)
+        # 간단 연결 확인
+        client.get_collections()
+        qdrant_ok = True
+        if agent_loaded:
+            try:
+                info = client.get_collection(Config.qdrant_collection)
+                collection_exists = True if info else False
+            except Exception:
+                collection_exists = False
+    except Exception:
+        qdrant_ok = False
+
     return {
-        "vector_store_loaded": agent_loaded,
+        "agent_initialized": agent_loaded,
+        "qdrant_reachable": qdrant_ok,
+        "collection_exists": collection_exists,
         "embedding_model_name": Config.embedding_model_name,
         "ollama_model": Config.ollama_model_name,
         "ollama_base_url": getattr(Config, "ollama_base_url", None),
