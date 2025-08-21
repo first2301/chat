@@ -50,3 +50,5 @@ ai_models/
 ollama_data/
 
 rag_data
+
+qdrant_data/

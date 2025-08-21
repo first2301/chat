@@ -3,8 +3,6 @@ langchain-ollama
 langchain-community
 pandas
 requests 
-evaluate
-deepeval
 beautifulsoup4
 fastapi
 uvicorn
