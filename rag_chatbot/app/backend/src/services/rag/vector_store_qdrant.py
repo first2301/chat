@@ -18,7 +18,7 @@ class VectorStoreManagerQdrant:
         embeddings: 임베딩 계산기(`HuggingFaceEmbeddings`).
         collection: 사용할 Qdrant 컬렉션 이름(미지정 시 `Config.qdrant_collection`).
         qdrant_url: Qdrant 서버 URL(미지정 시 `Config.qdrant_url`).
-        qdrant_api_key: Qdrant API 키(미지정 시 `Config.qdrant_api_key`).
+        # qdrant_api_key: Qdrant API 키(미지정 시 `Config.qdrant_api_key`).
 
     사용 방법:
         >>> mgr = VectorStoreManagerQdrant(embeddings)
@@ -35,12 +35,12 @@ class VectorStoreManagerQdrant:
             embeddings: HuggingFaceEmbeddings,
             collection: Optional[str] = None,
             qdrant_url: Optional[str] = None,
-            qdrant_api_key: Optional[str] = None,
+            # qdrant_api_key: Optional[str] = None,
     ):
         # 연결 지연을 고려해 타임아웃/재시도 포함 클라이언트 생성
         self.client = QdrantClient(
             url=qdrant_url if qdrant_url is not None else Config.qdrant_url,
-            api_key=qdrant_api_key if qdrant_api_key is not None else Config.qdrant_api_key,
+            # api_key=qdrant_api_key if qdrant_api_key is not None else Config.qdrant_api_key,
             timeout=Config.qdrant_timeout,
         )
         self.collection = collection or Config.qdrant_collection
