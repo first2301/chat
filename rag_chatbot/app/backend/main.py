@@ -4,6 +4,7 @@
 - 실행 시 `app` 객체를 사용하여 Uvicorn에서 서비스를 기동합니다.
 """
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from backend.src.api.routers import health as health_router
 from backend.src.api.routers import rag as rag_router
 from backend.src.api.routers import qdrant_admin as qdrant_admin_router
@@ -18,6 +19,14 @@ def create_app() -> FastAPI:
         lifespan 컨텍스트를 통해 `app.state.agent`를 수명 주기 동안 관리합니다.
     """
     app = FastAPI(title="RAG Service", lifespan=lifespan_context)
+    # CORS 설정: 프론트엔드 오리진을 환경변수 또는 널널한 기본값으로 허용
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # 배포 시 특정 오리진으로 제한 권장
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.include_router(health_router.router)
     app.include_router(rag_router.router)
     app.include_router(qdrant_admin_router.router)

@@ -4,7 +4,7 @@
 - reload: 벡터스토어 재로딩
 """
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, HTTPException
 from backend.src.services.rag.rag_agent import RAGAgent
 from backend.src.api.schemas.rag import (
     QueryRequest,
@@ -31,11 +31,25 @@ def rag_query(req: QueryRequest, agent: RAGAgent = Depends(get_agent)):
     Returns:
         dict: {"answer": str} — 생성된 답변 텍스트
     """
-    if req.mode == "manual":
-        return {"answer": agent.query(req.question)}
-    elif req.mode == "lcel":
-        return {"answer": agent.query_lcel(req.question)}
-    return {"error": "Invalid mode. Use 'manual' or 'lcel'."}
+    # 입력 검증: question 필수
+    if not req.question or not req.question.strip():
+        raise HTTPException(status_code=400, detail="'question' must not be empty")
+
+    try:
+        if req.mode == "manual":
+            answer = agent.query(req.question)
+        elif req.mode == "lcel":
+            answer = agent.query_lcel(req.question)
+        else:
+            # 잘못된 모드에 대해 400 반환
+            raise HTTPException(status_code=400, detail="Invalid mode. Use 'manual' or 'lcel'.")
+        return {"answer": answer}
+    except HTTPException:
+        # 이미 의미 있는 상태코드가 설정된 경우 그대로 전파
+        raise
+    except Exception as e:
+        # 기타 예외는 500으로 변환
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/reload")
