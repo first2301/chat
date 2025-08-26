@@ -9,7 +9,7 @@ uvicorn
 qdrant-client
 langchain-qdrant
 python-dotenv
- 
+gradio
 
 
 
