@@ -8,23 +8,12 @@ services:
     restart: unless-stopped
     environment:
       - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_MODELS=/home/ollama/.ollama
     ports:
       - "11435:11434"
     networks:
       - rag-chatbot-network
     volumes:
-      - ./app/ollama_data:/home/ollama/.ollama
-    # GPU 전달 및 보안/격리 강화
-    gpus: all
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    read_only: true
-    tmpfs:
-      - /tmp
-    user: "10001:10001"
+      - ./app/ollama_data:/root/.ollama
   qdrant:
     build:
       context: .

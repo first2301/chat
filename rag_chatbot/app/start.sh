@@ -6,7 +6,7 @@
 #   서버 프로세스를 포그라운드로 유지합니다.
 #
 # 사용 전제
-# - Modelfile 경로: /root/.ollama/Modelfile/ko-llama-8B
+# - Modelfile 경로: $OLLAMA_MODELS/Modelfile
 # - 내부 통신 포트: 11434 (localhost 기준)
 # - 이미지에 Modelfile이 COPY되어 있어야 함
 # -----------------------------------------------------------------------------
@@ -33,7 +33,7 @@ done
 #  - -f 인자는 '파일 경로'여야 하므로 디렉터리가 아닌 실제 Modelfile 지정
 if ! ollama list | grep -q "^ko-llama-8B"; then
   echo "[start.sh] Model 'ko-llama-8B' not found. Creating from Modelfile..."
-  ollama create ko-llama-8B -f /root/.ollama/Modelfile/ko-llama-8B
+  ollama create ko-llama-8B -f "$OLLAMA_MODELS/Modelfile"
 fi
 
 # 4) 모델 등록 완료 대기

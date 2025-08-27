@@ -1,5 +1,6 @@
 import gradio as gr
 import requests
+import time
 
 BACKEND_QUERY_URL = "http://backend:8000/rag/query"
 
@@ -11,14 +12,22 @@ def chat(message, history):
         resp = requests.post(
             BACKEND_QUERY_URL,
             json={"question": content},
-            # timeout=60,
         )
-        # resp.raise_for_status()
         data = resp.json()
         answer = data.get("answer", "")
     except Exception as e:
         answer = f"오류가 발생했습니다: {e}"
-    return {"role": "assistant", "content": answer}
+
+    # Gradio 제너레이터를 사용한 스트리밍(의사-스트리밍)
+    if not answer:
+        yield ""
+        return
+
+    step = 40  # 청크 크기(문자 수)
+    for i in range(0, len(answer), step):
+        partial = answer[: i + step]
+        yield partial
+        time.sleep(0.01)
 
 
 app = gr.ChatInterface(

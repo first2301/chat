@@ -15,11 +15,11 @@ RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 RUN python3 -m pip install --no-cache-dir --upgrade pip
 
 # Install Python dependencies first (better layer cache)
-COPY requirements_front.txt /tmp/requirements.txt
+COPY ../requirements/requirements_front.txt /tmp/requirements.txt
 RUN python3 -m pip install --no-cache-dir -r /tmp/requirements.txt
 
 # Copy frontend application code
-COPY app/frontend /app/frontend
+COPY ../app/frontend /app/frontend
 
 EXPOSE 7860
 CMD ["python3", "/app/frontend/chat_ui.py"]
