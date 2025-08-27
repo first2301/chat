@@ -160,12 +160,7 @@ class Config:
     @classmethod
     def validate(cls) -> None:
         """필수값과 경로 유효성을 검증합니다."""
-        missing = []
-        for key in ["OLLAMA_BASE_URL", "OLLAMA_MODEL", "QDRANT_URL", "QDRANT_COLLECTION"]:
-            if not os.getenv(key):
-                missing.append(key)
-        if missing:
-            raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
+        # 환경변수의 존재를 강제하지 않습니다. 클래스 기본값으로 운용 가능합니다.
 
         # 로컬 경로로 해석된 임베딩이면 존재해야 함
         emb = cls._resolved_embedding_model_name or cls.embedding_model_name

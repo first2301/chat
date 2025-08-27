@@ -23,7 +23,7 @@ def healthz(request: Request):
     qdrant_ok = None
     collection_exists = None
     try:
-        client = QdrantClient(url=Config.qdrant_url, api_key=Config.qdrant_api_key, timeout=Config.qdrant_timeout)
+        client = QdrantClient(url=Config.qdrant_url, timeout=Config.qdrant_timeout)
         # 간단 연결 확인
         client.get_collections()
         qdrant_ok = True

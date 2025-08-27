@@ -1,7 +1,7 @@
 import gradio as gr
 import requests
 
-BACKEND_QUERY_URL = "http://backend:8000/rag/query"
+BACKEND_QUERY_URL = "http://127.0.0.1:8000/query"
 
 
 def chat(message, history):
@@ -10,8 +10,8 @@ def chat(message, history):
     try:
         resp = requests.post(
             BACKEND_QUERY_URL,
-            json={"question": content},
-            # timeout=60,
+            json={"role": "user", "content": content},
+            timeout=60,
         )
         # resp.raise_for_status()
         data = resp.json()

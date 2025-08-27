@@ -4,6 +4,15 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 
+class QueryResponse(BaseModel):
+    """RAG 질의 응답 스키마.
+
+    Attributes:
+        answer: 질의 결과 텍스트
+    """
+    role: str = "assistant"
+    answer: str
+
 class QueryRequest(BaseModel):
     """RAG 질의 요청 스키마.
 
@@ -11,8 +20,9 @@ class QueryRequest(BaseModel):
         question: 사용자의 질문 텍스트
         mode: 체인 모드 선택("manual" | "lcel"), 기본값은 "lcel"
     """
+    role: str = "user"
     question: str
-    mode: str = "lcel"  # 'manual' | 'lcel'
+    # mode: str = "lcel"  # 'manual' | 'lcel'
 
 
 class IndexFilesRequest(BaseModel):

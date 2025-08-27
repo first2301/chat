@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Request, HTTPException
 from backend.src.services.rag.rag_agent import RAGAgent
 from backend.src.api.schemas.rag import (
     QueryRequest,
+    QueryResponse,
     IndexFilesRequest,
     IndexUrlsRequest,
     IndexTextRequest,
@@ -17,7 +18,33 @@ from backend.src.api.deps import get_agent
 router = APIRouter(prefix="/rag")
 
 
-@router.post("/query")
+@router.post("/query", response_model=QueryResponse)
+def rag_query_get(req: QueryRequest, agent: RAGAgent = Depends(get_agent)):
+    """RAG 질의를 처리합니다.
+
+    Args:
+        question: 질문 텍스트(경로 파라미터)
+        agent: 의존성 주입된 `RAGAgent`
+
+    Returns:
+        QueryResponse: {"answer": str}
+    """
+    try:
+        answer = agent.query_lcel(req.question)
+        if answer:
+            return QueryResponse(answer=answer)
+        else:
+            raise HTTPException(status_code=400, detail="I'm sorry, I don't know the answer to that question.")
+    except HTTPException:
+        # 이미 의미 있는 상태코드가 설정된 경우 그대로 전파
+        raise
+    except Exception as e:
+        # 기타 예외는 500으로 변환
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@router.post("/query_original")
 def rag_query(req: QueryRequest, agent: RAGAgent = Depends(get_agent)):
     """RAG 질의를 처리합니다.
 
