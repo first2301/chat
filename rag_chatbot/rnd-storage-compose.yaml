@@ -1,0 +1,10 @@
+services:
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./object_storage:/data
+    command: server /data
+    networks:
+      - rag-chatbot-network

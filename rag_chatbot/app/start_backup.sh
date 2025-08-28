@@ -33,9 +33,7 @@ done
 #  - -f 인자는 '파일 경로'여야 하므로 디렉터리가 아닌 실제 Modelfile 지정
 if ! ollama list | grep -q "^ko-llama-8B"; then
   echo "[start.sh] Model 'ko-llama-8B' not found. Creating from Modelfile..."
-  # compose에서 ./app/ollama_data 가 /home/ollama/.ollama 로 마운트됨
-  # 따라서 Modelfile의 실제 경로는 /home/ollama/.ollama/Modelfile 이어야 함
-  ollama create ko-llama-8B -f "/home/ollama/.ollama/Modelfile"
+  ollama create ko-llama-8B -f "/root/.ollama/Modelfile/ko-llama-8B"
 fi
 
 # 4) 모델 등록 완료 대기

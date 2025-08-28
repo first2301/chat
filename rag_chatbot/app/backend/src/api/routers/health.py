@@ -20,6 +20,9 @@ def healthz(request: Request):
     """
     agent = getattr(request.app.state, "agent", None)
     agent_loaded = agent is not None
+    # 체인 준비 상태 플래그 (agent가 있을 때만 평가)
+    retriever_ready = bool(getattr(agent, "retriever", None)) if agent_loaded else None
+    lcel_ready = bool(getattr(agent, "lcel_chain", None)) if agent_loaded else None
     qdrant_ok = None
     collection_exists = None
     try:
@@ -38,6 +41,8 @@ def healthz(request: Request):
 
     return {
         "agent_initialized": agent_loaded,
+        "retriever_ready": retriever_ready,
+        "lcel_chain_ready": lcel_ready,
         "qdrant_reachable": qdrant_ok,
         "collection_exists": collection_exists,
         "embedding_model_name": Config.embedding_model_name,

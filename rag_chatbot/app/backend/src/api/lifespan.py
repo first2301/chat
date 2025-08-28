@@ -26,10 +26,13 @@ async def lifespan_context(app: FastAPI):
     - 초기화 실패 시에도 앱은 기동하며, 의존성에서 503을 반환할 수 있습니다.
     """
     # 설정 로드/검증 및 에이전트 초기화를 보호 구간으로 묶어, 실패해도 앱은 기동
+    Config.load_env()
+    Config.resolve_paths()
+    Config.validate()
     try:
-        Config.load_env()
-        Config.resolve_paths()
-        Config.validate()
+        # Config.load_env()
+        # Config.resolve_paths()
+        # Config.validate()
         agent = RAGAgent()
     except Exception as e:
         logging.exception("Initialization during lifespan failed: %s", e)

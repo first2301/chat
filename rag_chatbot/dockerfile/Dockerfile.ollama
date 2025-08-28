@@ -1,50 +1,40 @@
 # ---- Stage 1: Ollama 바이너리만 추출 (버전 고정) ----
-    FROM ollama/ollama:0.11.5-rc3 AS ollama_src
+FROM ollama/ollama:0.11.5-rc3 AS ollama_src
 
-    # ---- Stage 2: CUDA 런타임 + 비루트 실행 ----
-    FROM nvidia/cuda:12.1.1-cudnn-runtime-ubuntu22.04
-    
-    ENV DEBIAN_FRONTEND=noninteractive \
-        OLLAMA_HOST=0.0.0.0 \
-        OLLAMA_MODELS=/home/ollama/.ollama
-    
-    WORKDIR /app
-    
-    # root로 필요한 도구 설치 (설치 단계 전용)
-    RUN apt-get update && apt-get install -y --no-install-recommends \
-          ca-certificates curl tini gosu \
-        && rm -rf /var/lib/apt/lists/*
-    
-    # Ollama 바이너리만 복사 (동적 링크 필요 라이브러리는 런타임에 제공/마운트)
-    COPY --from=ollama_src /bin/ollama /usr/local/bin/ollama
-    
-    # 비루트 사용자/그룹 생성 (고정 UID/GID 권장)
-    RUN groupadd -g 10001 ollama && useradd -m -u 10001 -g 10001 -s /bin/bash ollama
-    
-    # 모델/설정 디렉터리 준비 및 권한 부여
-    RUN mkdir -p /home/ollama/.ollama/Modelfile \
-     && chown -R ollama:ollama /home/ollama/.ollama
-    
-    # (옵션) Modelfile 이미지에 포함
-    COPY ../app/ollama_data/Modelfile/ /home/ollama/.ollama/Modelfile/
-    RUN chown -R ollama:ollama /home/ollama/.ollama/Modelfile
-    
-    # 엔트리포인트 스크립트
-    COPY ../app/start.sh /start.sh
-    RUN chmod +x /start.sh
+# ---- Stage 2: CUDA 런타임 + 비루트 실행 ----
+# FROM nvidia/cuda:12.1.1-cudnn-runtime-ubuntu22.04
+FROM ubuntu:22.04
 
-    # 컨테이너 기본 사용자 전환 (비루트)
-    USER ollama
-    
-    EXPOSE 11434
-    
-    # 서버 기동 후 모델 준비 상태 확인 (초기 기동 여유를 위해 start-period 부여)
-    HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=30 \
-      CMD ollama list | grep -q "ko-llama-8B" || exit 1
+ENV DEBIAN_FRONTEND=noninteractive 
 
-    # HEALTHCHECK --interval=10s --timeout=5s --start-period=10s \
-    #   CMD curl -sf http://127.0.0.1:11434/api/tags | grep -q "ko-llama-8B" || exit 1
-    
-    # 좀비 프로세스 방지
-    ENTRYPOINT ["/usr/bin/tini", "--", "/start.sh"]
-    
+WORKDIR /app
+
+# root로 필요한 도구 설치 (설치 단계 전용)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates curl tini gosu \
+    && rm -rf /var/lib/apt/lists/*
+
+# Ollama 바이너리만 복사 (동적 링크 필요 라이브러리는 런타임에 제공/마운트)
+COPY --from=ollama_src /bin/ollama /usr/local/bin/ollama
+
+# 비루트 사용자/그룹 생성 (고정 UID/GID 권장)
+RUN groupadd -g 10001 ollama && useradd -m -u 10001 -g 10001 -s /bin/bash ollama
+
+# 모델/설정 디렉터리 준비 및 권한 부여
+# 실제 Modelfile은 파일이며, 볼륨 마운트 지점은 /home/ollama/.ollama
+RUN mkdir -p /home/ollama/.ollama \
+  && chown -R ollama:ollama /home/ollama/.ollama
+
+# 엔트리포인트 스크립트
+COPY ../app/start.sh /start.sh
+RUN chmod +x /start.sh
+
+# 컨테이너 기본 사용자 전환 (비루트)
+USER ollama
+
+# 서버 기동 후 모델 준비 상태 확인 (초기 기동 여유를 위해 start-period 부여)
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=30 \
+  CMD ollama list | grep -q "ko-llama-8B" || exit 1
+
+# 좀비 프로세스 방지
+ENTRYPOINT ["/usr/bin/tini", "--", "/start.sh"]

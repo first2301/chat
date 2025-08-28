@@ -30,11 +30,16 @@ def rag_query_get(req: QueryRequest, agent: RAGAgent = Depends(get_agent)):
         QueryResponse: {"answer": str}
     """
     try:
-        answer = agent.query_lcel(req.question)
+        try:
+            # 우선 LCEL 체인을 사용한 정식 RAG 경로 시도
+            answer = agent.query_lcel(req.question)
+        except ValueError:
+            # LCEL 체인이 준비되지 않은 경우(예: 인덱스/컬렉션 미존재) LLM-only로 폴백
+            answer = agent.llm_query(req.question)
+
         if answer:
             return QueryResponse(answer=answer)
-        else:
-            raise HTTPException(status_code=400, detail="I'm sorry, I don't know the answer to that question.")
+        raise HTTPException(status_code=400, detail="I'm sorry, I don't know the answer to that question.")
     except HTTPException:
         # 이미 의미 있는 상태코드가 설정된 경우 그대로 전파
         raise

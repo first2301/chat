@@ -3,7 +3,7 @@ services:
   ollama:
     build:
       context: .
-      dockerfile: Dockerfile.ollama
+      dockerfile: ./dockerfile/Dockerfile.ollama
     container_name: rnd_chatbot_ollama
     restart: unless-stopped
     environment:
@@ -28,7 +28,7 @@ services:
   qdrant:
     build:
       context: .
-      dockerfile: Dockerfile.qdrant
+      dockerfile: ./dockerfile/Dockerfile.qdrant
     container_name: rnd_chatbot_qdrant
     restart: unless-stopped
     ports:
@@ -52,7 +52,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile.backend
+      dockerfile: ./dockerfile/Dockerfile.backend
     container_name: rnd_chatbot_backend
     restart: unless-stopped
     env_file:
@@ -83,7 +83,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile.frontend
+      dockerfile: ./dockerfile/Dockerfile.frontend
     container_name: rnd_chatbot_frontend
     restart: unless-stopped
     ports:

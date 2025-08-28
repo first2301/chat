@@ -61,7 +61,7 @@ class Config:
     k: int = int(os.getenv("K", 20))
 
     # Ollama 설정
-    ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://rnd_ollama:11434")
+    ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
     ollama_model_name: str = os.getenv("OLLAMA_MODEL", "ko-llama-8B")
     ollama_temperature: float = float(os.getenv("OLLAMA_TEMPERATURE", 0.1))
 
@@ -69,7 +69,7 @@ class Config:
     vector_store_path: Optional[str] = os.getenv("VECTOR_STORE_PATH")
 
     # Qdrant 설정
-    qdrant_url: str = os.getenv("QDRANT_URL", "http://rnd_qdrant:6333")
+    qdrant_url: str = os.getenv("QDRANT_URL", "http://qdrant:6333")
     # qdrant_api_key: Optional[str] = os.getenv("QDRANT_API_KEY")
     qdrant_collection: str = os.getenv("QDRANT_COLLECTION", "rag_collection")
     qdrant_timeout: float = float(os.getenv("QDRANT_TIMEOUT", 30))
