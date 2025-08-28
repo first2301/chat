@@ -2,6 +2,7 @@
 
 - 서비스 상태 및 현재 설정 일부를 노출합니다.
 - 운영 모니터링 및 헬스 프로브(liveness/readiness)에 사용합니다.
+- Qdrant 도달성 및 컬렉션 존재 여부를 간단히 점검합니다.
 """
 
 from fastapi import APIRouter, Request

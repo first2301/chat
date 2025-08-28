@@ -1,8 +1,8 @@
 """RAG 에이전트 구현.
 
-- 문서로부터 벡터 저장소를 구성하고, 리트리버-LLM 체인으로 질의를 처리합니다.
+- 문서로부터 벡터 저장소(Qdrant)를 구성하고, 리트리버-LLM 체인으로 질의를 처리합니다.
 - 수동 컨텍스트 주입 체인과 LCEL 결합 체인을 모두 제공합니다.
-- Qdrant 전용 벡터 스토어를 사용합니다.
+- LLM-only 경로를 지원하여 벡터스토어 미가용 시에도 기본 응답이 가능합니다.
 """
 
 from langchain_ollama import ChatOllama
@@ -16,14 +16,23 @@ from backend.src.services.rag.chain_builder import ChainBuilder
 class RAGAgent:
     """RAG 에이전트 클래스.
 
-    Args:
-        document_paths: 초기 인덱싱용 문서 경로(파일/URL)
-        embedding_model: 사전 생성된 임베딩 모델(미지정 시 Config에서 생성)
-        chunk_size: 분할 크기(None이면 Config 값)
-        chunk_overlap: 분할 중복 크기(None이면 Config 값)
-        k: 검색 상위 k개(None이면 Config 값)
-        ollama_base_url: Ollama 서버 URL(None이면 Config 값)
-        ollama_model_name: Ollama 모델 이름(None이면 Config 값)
+    Attributes:
+        document_paths: 인덱싱 대상 문서/URL 경로 목록
+        chunk_size: 문서 분할 크기(문자 기준)
+        chunk_overlap: 분할 중복 크기
+        k: 검색 상위 k개
+        ollama_temperature: LLM 온도
+        ollama_model: Ollama 모델명
+        ollama_base_url: Ollama 서버 URL
+        callback_manager: LangChain 콜백 매니저(스트리밍 로그 등)
+        embedding_model: 임베딩 모델(HuggingFaceEmbeddings)
+        vector_store: Qdrant 기반 벡터 스토어 인스턴스
+        retriever: LangChain 리트리버
+        ingestion: 인제스천 서비스(로딩/분할)
+        chain_builder: 체인 빌더(프롬프트/체인 구성)
+        llm: ChatOllama 인스턴스
+        chain: 수동 컨텍스트 주입 체인
+        lcel_chain: 리트리버 결합 LCEL 체인
 
     Raises:
         RuntimeError: Qdrant 벡터 스토어 초기화 실패 시

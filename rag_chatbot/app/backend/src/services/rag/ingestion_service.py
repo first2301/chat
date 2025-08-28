@@ -1,4 +1,13 @@
-"""인제스천 서비스: 파일 스캔 + 로딩 + 분할 통합."""
+"""인제스천 서비스: 파일 스캔 + 로딩 + 분할 통합.
+
+역할:
+- 데이터 소스 파일/URL을 탐색(discover)하고, 문서를 로드(load)하며, 텍스트를 분할(split)합니다.
+
+정책/규칙:
+- 파일 검색은 `DATA_DIR` 하위로 제한합니다(경로 탈출 방지).
+- `urls/` 디렉터리 하위 또는 `*.url.txt|*.urls.txt` 텍스트 파일은 URL 목록으로 간주합니다.
+- PDF는 PyMuPDF, 일반 텍스트는 UTF-8(오류 무시)로 로드합니다.
+"""
 
 from __future__ import annotations
 
@@ -33,6 +42,7 @@ class IngestionService:
             patterns: 파일 패턴 목록
 
         Returns:
+            List[str]: 발견된 파일의 절대 경로 목록(중복 제거, 정렬)
         """
         # DATA_DIR 내부에서만 스캔하도록 기준 디렉터리를 엄격히 고정합니다.
         base = Path(data_dir or Config.get_data_dir()).resolve()
@@ -50,6 +60,12 @@ class IngestionService:
         return sorted(list(dict.fromkeys(results)))
 
     def load_files(self, paths: List[str]):
+        """파일 경로 목록을 문서로 로드합니다.
+
+        - 디렉터리가 포함된 경우 글롭 패턴에 따라 파일을 확장합니다.
+        - `.pdf`는 `PyMuPDFLoader`, 그 외 텍스트 파일은 일반 텍스트로 취급합니다.
+        - `urls/` 디렉터리 하위 혹은 `*.url.txt|*.urls.txt`는 URL 목록 파일로 간주하여 웹 수집으로 전환합니다.
+        """
         from langchain_core.documents import Document
 
         documents = []
@@ -100,6 +116,12 @@ class IngestionService:
         return documents
 
     def load_urls(self, urls: List[str]):
+        """URL 목록을 웹에서 수집하여 문서로 로드합니다.
+
+        Note:
+            - User-Agent를 지정하여 일부 사이트의 차단을 회피합니다.
+            - 과도한 병렬 수집/빈번한 호출은 서버에 부담을 줄 수 있습니다.
+        """
         loader = WebBaseLoader(
             web_paths=urls,
             header_template={
@@ -109,9 +131,11 @@ class IngestionService:
         return loader.load()
 
     def split(self, documents: List):
+        """분할기 설정에 따라 문서를 분할합니다."""
         return self._splitter.split_documents(documents)
 
     def documents_from_texts(self, texts: List[str], source: str | None = None):
+        """간단한 문자열 리스트를 문서 객체로 감싸 반환합니다."""
         from langchain_core.documents import Document
 
         return [Document(page_content=t, metadata={"source": source or "inline"}) for t in texts]

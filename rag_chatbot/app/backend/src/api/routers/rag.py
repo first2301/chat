@@ -1,7 +1,11 @@
 """RAG 질의/관리 엔드포인트.
 
-- query: RAG 질의 처리(수동/LCEL 체인 선택)
-- reload: 벡터스토어 재로딩
+제공 기능:
+- `/rag/query`: RAG 질의 처리(기본 LCEL 체인, 미준비 시 LLM-only 폴백)
+- `/rag/query_original`: 모드 선택형(manual|lcel) RAG 질의 처리
+- `/rag/reload`: Qdrant 벡터스토어 재로딩
+- `/rag/bootstrap`: lifespan 이전/실패 시 지연 초기화
+- `/rag/index/*`: 파일/URL/텍스트 인덱싱
 """
 
 from fastapi import APIRouter, Depends, Request, HTTPException

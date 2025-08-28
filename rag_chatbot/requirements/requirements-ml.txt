@@ -1,5 +1,5 @@
 sentence-transformers
 langchain-huggingface
-faiss-cpu
+torch
 pymupdf
 

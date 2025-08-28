@@ -1,4 +1,10 @@
-"""체인 빌더: 프롬프트 생성 + 체인 구성 통합."""
+"""체인 빌더: 프롬프트 생성 + 체인 구성 통합.
+
+구성 요소:
+- 기본 시스템/휴먼 메시지 템플릿을 생성합니다.
+- 수동 체인(manual): `{context, question}` 입력을 받아 LLM으로 전달합니다.
+- LCEL 체인: 리트리버 출력과 질문을 매핑하여 프롬프트→LLM→문자열 파서를 연결합니다.
+"""
 
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from langchain_core.output_parsers import StrOutputParser

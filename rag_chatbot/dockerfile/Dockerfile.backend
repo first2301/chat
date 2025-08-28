@@ -1,4 +1,5 @@
-FROM python:3.12.11-slim
+# FROM python:3.12.11-slim
+FROM ubuntu:22.04
 
 # 파이썬/ pip 기본 설정
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -11,24 +12,40 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # 패키지 설치
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#     build-essential gcc curl ca-certificates \
+#   && rm -rf /var/lib/apt/lists/*
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential gcc curl ca-certificates \
+    python3 python3-pip python3-venv python3-dev \
+    build-essential gcc curl ca-certificates git \
   && rm -rf /var/lib/apt/lists/*
 
+
 # pip 업데이트
-RUN python3 -m pip install --no-cache-dir --upgrade pip
 
 # Install Python dependencies first (better layer cache)
 COPY ../requirements/requirements_base.txt /tmp/requirements.txt
 COPY ../requirements/requirements-ml.txt /tmp/requirements-ml.txt
 
-RUN python -m pip install --upgrade pip \
- && python -m pip install -r /tmp/requirements.txt \
- && python -m pip install -r /tmp/requirements-ml.txt
+RUN python3 -m pip install --no-cache-dir --upgrade pip \
+ && python3 -m pip install --no-cache-dir -r /tmp/requirements.txt \
+ && python3 -m pip install --no-cache-dir -r /tmp/requirements-ml.txt
 
 # Copy backend application code (rest will be bind-mounted in compose)
 COPY ../app/backend /app/backend
 
-EXPOSE 8000
-CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# 보안: 비루트 사용자 생성 및 권한 설정
+RUN groupadd --gid 1000 app \
+  && useradd --uid 1000 --gid app --create-home --shell /bin/bash appuser \
+  && chown -R appuser:app /app
+
+USER appuser
+
+# 간단 헬스체크: CUDA 인식 여부
+HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
+  CMD python3 -c "import torch, sys; sys.exit(0 if torch.cuda.is_available() else 1)"
+
+# EXPOSE 8000
+CMD ["python3", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 

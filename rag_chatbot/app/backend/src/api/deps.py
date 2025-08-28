@@ -1,7 +1,7 @@
 """API 의존성 주입(Dependencies).
 
 - 요청 컨텍스트에서 `app.state.agent`를 안전하게 주입합니다.
-- 벡터스토어가 아직 로드되지 않았다면 503을 반환합니다.
+- 에이전트 초기화 실패/지연 시 503(Service Unavailable)을 반환합니다.
 """
 
 from typing import Optional

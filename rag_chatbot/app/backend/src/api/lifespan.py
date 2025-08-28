@@ -1,8 +1,8 @@
 """애플리케이션 수명(lifespan) 관리.
 
-- 앱 시작 시 `RAGAgent`를 초기화하고 벡터스토어를 로드합니다.
-- 초기 인덱스가 없거나 로드 실패 시 `app.state.agent = None`로 설정합니다.
-- 종료 시 별도 정리가 필요하면 이 컨텍스트의 종료 블록에 추가합니다.
+- 앱 시작 시 환경 로드/경로 해석/검증을 수행하고 `RAGAgent`를 초기화합니다.
+- 초기 인덱스가 없거나 로드 실패 시에도 앱은 기동하며, 의존성에서 503이 반환될 수 있습니다.
+- 종료 시 별도 정리가 필요하면 종료 블록에 추가합니다.
 """
 
 from contextlib import asynccontextmanager
@@ -19,7 +19,7 @@ async def lifespan_context(app: FastAPI):
 
     동작 개요:
     - 환경변수 로드(`.env/.env.dev/.env.prod.dev` 탐색) 및 경로 해석/검증
-    - `RAGAgent` 생성(Qdrant 우선, 미존재 시 자동 인덱싱 정책 적용 가능)
+    - `RAGAgent` 생성(Qdrant 우선, 정책에 따라 자동 인덱싱 가능)
     - 앱 상태에 에이전트 바인딩(`app.state.agent`)
 
     예외 처리:

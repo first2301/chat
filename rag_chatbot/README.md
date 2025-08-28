@@ -14,11 +14,11 @@ docker compose -f rag_chatbot/rnd-rag-compose.yaml up -d --build
 - **상태 점검**
 ```bash
 curl http://localhost:8000/healthz
-# 정상 예: {"vector_store_loaded": true, "embedding_model_name": "...", "ollama_model": "...", "ollama_base_url": "http://ollama:11434"}
+# 정상 예: {"agent_initialized": true, "retriever_ready": true, "lcel_chain_ready": true, "qdrant_reachable": true, "collection_exists": true, "embedding_model_name": "...", "ollama_model": "...", "ollama_base_url": "http://ollama:11434"}
 ```
 - **테스트 질의(LLM-only)**
 ```bash
-curl -X POST "http://localhost:8000/rag/test_query/ ㅇㅇㅇ 회사 소개"
+curl -X POST "http://localhost:8000/rag/test_query/회사소개"
 ```
 
 ### 2) 서비스 구성(중요)
@@ -52,10 +52,8 @@ curl -X POST "http://localhost:8000/rag/test_query/ ㅇㅇㅇ 회사 소개"
 ### 5) RAG 내부 동작(매우 중요)
 - 클래스: `app/backend/src/services/rag/rag_agent.py`
 - 임베딩: `HuggingFaceEmbeddings` (`EMBEDDING_MODEL_NAME`, CPU/CUDA 자동 판단)
-- 벡터스토어(우선순위)
-  1. Qdrant(`app/backend/src/services/rag/vector_store_qdrant.py`)
-     - 컬렉션 없으면 임베딩 차원으로 생성
-  2. 폴백: FAISS(로컬 디스크)
+- 벡터스토어: Qdrant(`app/backend/src/services/rag/vector_store_qdrant.py`)
+  - 컬렉션 없으면 임베딩 차원으로 생성
 - 체인: 수동 컨텍스트 체인 + LCEL 체인(둘 다 제공)
 - 자동 인덱싱: `ON_MISSING_VECTOR_STORE=auto_build`일 때 `DATA_DIR` 스캔으로 초기 업서트 가능
 
@@ -80,7 +78,7 @@ curl -X POST "http://localhost:8000/rag/test_query/회사 소개 부탁해"
 ```bash
 curl -X POST http://localhost:8000/rag/query \
   -H "Content-Type: application/json" \
-  -d '{"question": "문서 요약 부탁해", "mode": "lcel"}'
+  -d '{"question": "문서 요약 부탁해"}'
 ```
 - 파일 인덱싱
 ```bash
@@ -145,5 +143,62 @@ docker compose -f rag_chatbot/rnd-rag-compose.yaml build --no-cache
 
 ---
 문의/개선 제안은 본 리포지토리 이슈로 등록해 주세요. 운영 환경에서는 헬스체크와 재시도 정책(백오프)을 강화하는 것을 권장합니다.
+
+### 14) RAG 프로세스 한눈에 보기
+
+- 전체 플로우는 아래 다이어그램을 참고하세요. 수명주기에서 에이전트가 초기화되고, 요청 시 DI로 주입되어 RAG 체인 또는 LLM-only로 경로가 결정됩니다.
+
+```mermaid
+flowchart TD
+  A["클라이언트 요청"] --> B["FastAPI 라우터: /rag/*, /healthz"]
+  B --> C["DI: get_agent()\\napp.state.agent 주입"]
+  C --> D{"에이전트 초기화 여부"}
+  D -- "초기화" --> E["RAGAgent"]
+  D -- "미초기화" --> L["503 또는 /rag/bootstrap"]
+
+  subgraph Lifespan
+    LS1["Config.load_env() / resolve_paths() / validate()"]
+    LS2["RAGAgent() 생성 및 바인딩"]
+  end
+
+  LS1 --> LS2
+  LS2 --> E
+
+  subgraph RAGAgent 내부
+    E --> F["Embedding: HuggingFaceEmbeddings"]
+    E --> G["VectorStore: Qdrant"]
+    E --> H["IngestionService: 로딩/분할"]
+    E --> I["ChainBuilder: 프롬프트/체인"]
+    E --> J["LLM: ChatOllama"]
+  end
+
+  G --> K{"컬렉션 존재?"}
+  K -- "있음" --> I
+  K -- "없음 & auto_build" --> H
+  H --> G
+  I --> M["수동 체인(manual) & LCEL 체인"]
+
+  subgraph 질의 처리
+    N["/rag/query(lcel 기본)"] --> O{"LCEL 준비?"}
+    O -- "예" --> P["retriever→format→LLM"]
+    O -- "아니오" --> Q["LLM-only"]
+  end
+
+  subgraph 인덱싱
+    R["/rag/index/files|urls|text"] --> H
+    H --> G
+    G --> I
+  end
+
+  B --> S["/healthz: 상태/설정/Qdrant 체크"]
+```
+
+#### LCEL/수동 체인 요약
+- 수동 체인: `{context, question}`을 직접 주입하는 단순 체인
+- LCEL 체인: `retriever → 문서 포맷팅 → 프롬프트 → LLM → 문자열 파서`
+
+#### 자동 인덱싱 정책
+- `ON_MISSING_VECTOR_STORE=auto_build`: 초기 문서 경로 미지정 시 `DATA_DIR` + `DOC_GLOBS` 스캔으로 인덱싱 시도
+- 실패 시에도 앱은 기동하며, `/rag/bootstrap` 또는 `/rag/index/*`로 사후 인덱싱 가능
 
 

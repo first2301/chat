@@ -2,6 +2,7 @@
 
 - 앱 팩토리(`create_app`)에서 라우터를 연결하고 lifespan 컨텍스트를 설정합니다.
 - 실행 시 `app` 객체를 사용하여 Uvicorn에서 서비스를 기동합니다.
+- CORS는 배포 환경에서 제한적으로 설정하는 것을 권장합니다.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
