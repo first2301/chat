@@ -10,8 +10,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+# 패키지 설치
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+       build-essential gcc g++ make pkg-config ca-certificates\
+       git curl python3-dev \
+       libffi-dev libssl-dev \
+       # (필요시 추가) libgl1 libglib2.0-0 libsndfile1 portaudio19-dev libxml2-dev libxslt1-dev \
+  && rm -rf /var/lib/apt/lists/*
 
+# pip 업데이트
 RUN python3 -m pip install --no-cache-dir --upgrade pip
 
 # Install Python dependencies first (better layer cache)
